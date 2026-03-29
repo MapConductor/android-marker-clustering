@@ -29,4 +29,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "mapconductor-marker-clustering"
+rootProject.name = "android-marker-clustering"
