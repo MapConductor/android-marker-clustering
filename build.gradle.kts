@@ -68,8 +68,11 @@ kotlin {
 }
 
 dependencies {
-    debugImplementation(project(":android-sdk-core"))
-    releaseImplementation("com.mapconductor:core:$coreLibraryVersion")
+    if (findProject(":android-sdk-core") != null) {
+        implementation(project(":android-sdk-core"))
+    } else {
+        implementation("com.mapconductor:core:${project.findProperty("coreLibraryVersion") as String? ?: "1.0.0"}")
+    }
 
 
     // Compose dependencies for DefaultIcon
