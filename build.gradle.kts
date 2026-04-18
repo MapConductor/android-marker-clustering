@@ -2,9 +2,10 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("org.jlleitschuh.gradle.ktlint")
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("maven-publish")
     id("signing")
+    id("com.gradleup.nmcp") version "0.0.8"
 }
 
 ktlint {
@@ -168,24 +169,25 @@ publishing {
             }
         }
 
-        maven {
-            name = "OSSRH"
-            val releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-            val snapshotsRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
-            setUrl(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            credentials {
-                username = project.findProperty("ossrh.username") as String? ?: System.getenv("OSSRH_USERNAME")
-                password = project.findProperty("ossrh.password") as String? ?: System.getenv("OSSRH_PASSWORD")
-            }
-        }
     }
 }
 
 signing {
     val signingKey = findProperty("signingKey") as String?
     val signingPassword = findProperty("signingPassword") as String?
-    if (signingKey != null && signingPassword != null) {
+    if (!signingKey.isNullOrEmpty() && !signingPassword.isNullOrEmpty()) {
         useInMemoryPgpKeys(signingKey, signingPassword)
         sign(publishing.publications["release"])
     }
 }
+
+if (project == rootProject) {
+    // standalone build only — in multi-project (android-sdk), parent configures nmcp
+    nmcp {
+        publish("release") {
+            username = findProperty("ossrh_username") as String? ?: System.getenv("OSSRH_USERNAME") ?: ""
+            password = findProperty("ossrh_password") as String? ?: System.getenv("OSSRH_PASSWORD") ?: ""
+        }
+    }
+}
+
