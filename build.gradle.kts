@@ -57,15 +57,6 @@ android {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(
-            org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(
-                project.property("jvmTarget").toString(),
-            ),
-        )
-    }
-}
 
 dependencies {
     if (findProject(":android-sdk-core") != null) {
