@@ -1,11 +1,10 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("maven-publish")
     id("signing")
-    id("com.gradleup.nmcp") version "0.0.8"
+    id("com.gradleup.nmcp")
 }
 
 ktlint {
@@ -96,14 +95,14 @@ val libraryArtifactId = "marker-clustering"
 val libraryVersion = project.findProperty("libraryVersion") as String? ?: "1.0.0"
 val coreLibraryVersion = project.findProperty("coreLibraryVersion") as String? ?: "1.0.0"
 
-// Set project version for NMCP plugin
+// Set project version
 version = libraryVersion
 val libraryName = "MapConductor Marker Clustering"
 val libraryDescription = "Marker clustering strategy for MapConductor"
 
 val javadocJar by tasks.registering(Jar::class) {
     archiveClassifier.set("javadoc")
-    // Since Android libraries don't have javadoc task by default, create empty jar
+    // Since Android libraries don't have Javadoc task by default, create empty jar
 }
 
 publishing {
