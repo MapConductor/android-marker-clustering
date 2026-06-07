@@ -2,6 +2,9 @@
 .gradle/
 build/
 
+# Rust/Wasm build artifacts
+clustering-wasm/target/
+
 # Local configuration file (sdk path, etc)
 local.properties
 
