@@ -65,6 +65,8 @@ class MarkerClusterStrategy<ActualMarker>(
     private val sourceStates = ConcurrentHashMap<String, MarkerState>()
     private val sourceStateVersion = AtomicLong(0)
     private var lastCameraPosition: MapCameraPosition? = null
+    private var lastKnownViewport: GeoRectBounds? = null
+    private var lastKnownViewportZoom: Double? = null
     private var clusteringTurn = 0
     private var lastZoomKey: Int? = null
     private val debounceScope = CoroutineScope(Dispatchers.Default)
@@ -103,6 +105,8 @@ class MarkerClusterStrategy<ActualMarker>(
         renderCount = 0
         renderedMarkerEntities.clear()
         lastRenderCameraPosition = null
+        lastKnownViewport = null
+        lastKnownViewportZoom = null
     }
 
     override suspend fun onAdd(
@@ -143,6 +147,10 @@ class MarkerClusterStrategy<ActualMarker>(
         renderer: MarkerOverlayRendererInterface<ActualMarker>,
     ) {
         lastCameraPosition = cameraPosition
+        cameraPosition.visibleRegion?.bounds?.let {
+            lastKnownViewport = it
+            lastKnownViewportZoom = cameraPosition.zoom
+        }
         lastRenderer = renderer
         val token = cameraUpdateToken.incrementAndGet()
         if (debounceJob?.isActive == true && !isRendering) {
@@ -155,7 +163,15 @@ class MarkerClusterStrategy<ActualMarker>(
                 }
                 if (token != cameraUpdateToken.get()) return@launch
                 val currentCamera = lastCameraPosition ?: return@launch
-                val viewport = currentCamera.visibleRegion?.bounds ?: return@launch
+                // Use the viewport from the camera position if available, otherwise fall back to
+                // the last known viewport scaled by the zoom delta. Some map providers (e.g. ArcGIS)
+                // emit camera-change events with a null visibleRegion during animations; scaling the
+                // last known viewport by 2^(zoomDelta) preserves the correct screen-space coverage
+                // so that markers newly visible after a zoom-out are included in clustering.
+                val viewport =
+                    currentCamera.visibleRegion?.bounds
+                        ?: estimateViewport(currentCamera.zoom)
+                        ?: return@launch
                 val currentRenderer = lastRenderer ?: return@launch
                 enqueueRender(currentCamera, viewport, currentRenderer, token)
             }
@@ -1257,6 +1273,27 @@ class MarkerClusterStrategy<ActualMarker>(
         }
 
         return GeoPoint.from(bestPoint.member.position)
+    }
+
+    // Returns a viewport estimate for the given zoom level when the actual visibleRegion is
+    // unavailable. Scales the last known viewport around its center by 2^(zoomDelta) so that
+    // the estimated bounds cover the same screen-space area as the new zoom level.
+    private fun estimateViewport(zoom: Double): GeoRectBounds? {
+        val base = lastKnownViewport ?: return null
+        val baseZoom = lastKnownViewportZoom ?: return null
+        val zoomDelta = baseZoom - zoom
+        if (zoomDelta == 0.0) return base
+        val sw = base.southWest ?: return base
+        val ne = base.northEast ?: return base
+        val centerLat = (sw.latitude + ne.latitude) / 2.0
+        val centerLon = (sw.longitude + ne.longitude) / 2.0
+        val scale = 2.0.pow(zoomDelta)
+        val halfLat = (ne.latitude - sw.latitude) / 2.0 * scale
+        val halfLon = (ne.longitude - sw.longitude) / 2.0 * scale
+        val result = GeoRectBounds()
+        result.extend(GeoPoint((centerLat - halfLat).coerceIn(-90.0, 90.0), (centerLon - halfLon).coerceIn(-180.0, 180.0)))
+        result.extend(GeoPoint((centerLat + halfLat).coerceIn(-90.0, 90.0), (centerLon + halfLon).coerceIn(-180.0, 180.0)))
+        return result
     }
 
     private fun effectiveClusterRadiusPx(zoom: Double): Double {
