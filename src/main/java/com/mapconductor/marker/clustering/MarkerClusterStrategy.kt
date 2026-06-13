@@ -58,8 +58,6 @@ class MarkerClusterStrategy<ActualMarker>(
     private val tileSize: Double = DEFAULT_TILE_SIZE,
     semaphore: Semaphore = Semaphore(3),
     private val geocell: HexGeocellInterface = HexGeocell.defaultGeocell(),
-    /** Optional Wasm engine. When provided, grid-assignment and merge run in the Wasm module. */
-    private val wasmEngine: ClusteringWasmEngine? = null,
 ) : AbstractMarkerRenderingStrategy<ActualMarker>(semaphore) {
     override val markerManager: MarkerManager<ActualMarker> = MarkerManager(geocell, 0)
     private val sourceStates = ConcurrentHashMap<String, MarkerState>()
@@ -360,42 +358,33 @@ class MarkerClusterStrategy<ActualMarker>(
             }
 
             val desiredMarkerStates = mutableListOf<MarkerState>()
-            val mergedClusters: List<MergedCluster> =
-                if (wasmEngine != null && newMarkers.isNotEmpty()) {
-                    wasmEngine
-                        .computeClusters(newMarkers, zoom, effectiveRadiusPx, tileSize)
-                        .map { group ->
-                            MergedCluster(center = group.center, members = group.members)
-                        }
-                } else {
-                    val clustered = mutableMapOf<ClusterCell, MutableList<MarkerState>>()
-                    newMarkers.forEach { state ->
-                        currentCoroutineContext().ensureActive()
-                        val (x, y) = projectToPixel(state.position, zoom, tileSize)
-                        val cell =
-                            ClusterCell(
-                                x = floor(x / effectiveRadiusPx).toInt(),
-                                y = floor(y / effectiveRadiusPx).toInt(),
-                            )
-                        clustered.getOrPut(cell) { mutableListOf() }.add(state)
+            val clustered = mutableMapOf<ClusterCell, MutableList<MarkerState>>()
+            newMarkers.forEach { state ->
+                currentCoroutineContext().ensureActive()
+                val (x, y) = projectToPixel(state.position, zoom, tileSize)
+                val cell =
+                    ClusterCell(
+                        x = floor(x / effectiveRadiusPx).toInt(),
+                        y = floor(y / effectiveRadiusPx).toInt(),
+                    )
+                clustered.getOrPut(cell) { mutableListOf() }.add(state)
+            }
+            val candidates =
+                clustered.entries
+                    .sortedWith(
+                        compareBy<MutableMap.MutableEntry<ClusterCell, MutableList<MarkerState>>> {
+                            it.key.x
+                        }.thenBy { it.key.y },
+                    ).mapNotNull { entry ->
+                        val members = entry.value
+                        val center = members.firstOrNull()?.position ?: return@mapNotNull null
+                        ClusterCandidate(
+                            cell = entry.key,
+                            center = GeoPoint.from(center),
+                            members = members.toMutableList(),
+                        )
                     }
-                    val candidates =
-                        clustered.entries
-                            .sortedWith(
-                                compareBy<MutableMap.MutableEntry<ClusterCell, MutableList<MarkerState>>> {
-                                    it.key.x
-                                }.thenBy { it.key.y },
-                            ).mapNotNull { entry ->
-                                val members = entry.value
-                                val center = members.firstOrNull()?.position ?: return@mapNotNull null
-                                ClusterCandidate(
-                                    cell = entry.key,
-                                    center = GeoPoint.from(center),
-                                    members = members.toMutableList(),
-                                )
-                            }
-                    mergeClusters(candidates, zoom, effectiveRadiusPx)
-                }
+            val mergedClusters: List<MergedCluster> = mergeClusters(candidates, zoom, effectiveRadiusPx)
 
             val finalMergedClusters = mutableListOf<MergedCluster>()
             val usedCachedClusters = mutableSetOf<String>()

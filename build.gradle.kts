@@ -84,63 +84,9 @@ dependencies {
     // Coroutines for Semaphore and withPermit
     implementation(libs.kotlinx.coroutines.android)
 
-    // Wasm runtime for native clustering acceleration
-    implementation(libs.chicory.runtime)
-
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-}
-
-// --- Wasm build task ---
-// Rebuilds clustering_wasm.wasm from Rust source and copies it to assets.
-// Normal Android builds do NOT require Rust; the committed .wasm is used as-is.
-// Run `./gradlew :android-marker-clustering:buildClusteringWasm` after editing clustering-wasm/src/lib.rs.
-tasks.register("buildClusteringWasm") {
-    group = "build"
-    description = "Compiles clustering-wasm Rust source to WebAssembly (requires Rust toolchain)"
-
-    inputs.dir(project.file("clustering-wasm/src"))
-    inputs.file(project.file("clustering-wasm/Cargo.toml"))
-    outputs.file(project.file("src/main/assets/clustering_wasm.wasm"))
-
-    doLast {
-        val homeDir = System.getProperty("user.home") ?: ""
-        val homeCargoPath = "$homeDir/.cargo/bin/cargo"
-        val cargo: String =
-            if (project.file(homeCargoPath).exists()) {
-                homeCargoPath
-            } else {
-                runCatching {
-                    ProcessBuilder("which", "cargo")
-                        .start()
-                        .inputStream
-                        .bufferedReader()
-                        .readLine()
-                        ?.takeIf { it.isNotBlank() }
-                }.getOrNull() ?: error(
-                    "cargo not found. Install Rust from https://rustup.rs and re-run.",
-                )
-            }
-
-        val exitCode =
-            ProcessBuilder(cargo, "build", "--release", "--target", "wasm32-unknown-unknown")
-                .directory(project.file("clustering-wasm"))
-                .also { pb ->
-                    pb.environment()["PATH"] = "$homeDir/.cargo/bin:${System.getenv("PATH") ?: ""}"
-                    pb.inheritIO()
-                }.start()
-                .waitFor()
-        check(exitCode == 0) { "cargo build failed (exit $exitCode)" }
-
-        val wasmSrc =
-            project.file(
-                "clustering-wasm/target/wasm32-unknown-unknown/release/clustering_wasm.wasm",
-            )
-        val wasmDst = project.file("src/main/assets/clustering_wasm.wasm")
-        wasmSrc.copyTo(wasmDst, overwrite = true)
-        logger.lifecycle("clustering_wasm.wasm updated in src/main/assets/")
-    }
 }
 
 // Publishing configuration

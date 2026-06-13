@@ -29,36 +29,21 @@ jobs:
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode > "$HOME/secring.gpg"
           gpg --batch --import "$HOME/secring.gpg"
 
-      - name: Check core availability (Maven Central or GitHub Packages)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build core locally
         run: |
-          CORE_VERSION=$(grep '^coreLibraryVersion=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
-          if [[ -z "$CORE_VERSION" ]]; then
-            CORE_VERSION=$(grep '^libraryVersion=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
-          fi
-          if [[ -z "$CORE_VERSION" ]]; then
-            echo "ERROR: Could not determine core version from gradle.properties"
-            exit 1
-          fi
+            git clone --depth 1 https://github.com/MapConductor/android-sdk-core.git _core
+            cd _core
+            ./gradlew --no-daemon publishToMavenLocal
+            cd ..
 
-          echo "Checking com.mapconductor:core:${CORE_VERSION}"
-
-          MC_URL="https://repo1.maven.org/maven2/com/mapconductor/core/${CORE_VERSION}/core-${CORE_VERSION}.pom"
-          if curl -fsSL "$MC_URL" > /dev/null 2>&1; then
-            echo "Found on Maven Central"
-            exit 0
-          fi
-
-          GPR_URL="https://maven.pkg.github.com/MapConductor/android-sdk-core/com/mapconductor/core/${CORE_VERSION}/core-${CORE_VERSION}.pom"
-          if curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" "$GPR_URL" > /dev/null 2>&1; then
-            echo "Found on GitHub Packages"
-            exit 0
-          fi
-
-          echo "ERROR: com.mapconductor:core:${CORE_VERSION} not found on Maven Central or GitHub Packages."
-          echo "Please publish android-sdk-core first."
-          exit 1
+            mkdir -p "$HOME/.gradle/init.d"
+            cat > "$HOME/.gradle/init.d/use-local-maven.init.gradle" << 'EOF'
+            gradle.settingsEvaluated { settings ->
+                settings.dependencyResolutionManagement.repositories {
+                    mavenLocal()
+                }
+            }
+            EOF
 
       - name: Check version and publish to Maven Central
         env:
