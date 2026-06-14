@@ -1281,9 +1281,19 @@ class MarkerClusterStrategy<ActualMarker>(
         val halfLon = (ne.longitude - sw.longitude) / 2.0 * scale
         val result = GeoRectBounds()
         result
-            .extend(GeoPoint((centerLat - halfLat).coerceIn(-90.0, 90.0), (centerLon - halfLon).coerceIn(-180.0, 180.0)))
+            .extend(
+                GeoPoint(
+                    (centerLat - halfLat).coerceIn(-90.0, 90.0),
+                    (centerLon - halfLon).coerceIn(-180.0, 180.0),
+                ),
+            )
         result
-            .extend(GeoPoint((centerLat + halfLat).coerceIn(-90.0, 90.0), (centerLon + halfLon).coerceIn(-180.0, 180.0)))
+            .extend(
+                GeoPoint(
+                    (centerLat + halfLat).coerceIn(-90.0, 90.0),
+                    (centerLon + halfLon).coerceIn(-180.0, 180.0),
+                ),
+            )
         return result
     }
 
