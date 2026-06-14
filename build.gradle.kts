@@ -74,7 +74,6 @@ dependencies {
         implementation("com.mapconductor:core:${project.findProperty("coreLibraryVersion") as String? ?: "1.0.0"}")
     }
 
-
     // Compose dependencies for DefaultIcon
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -167,7 +166,6 @@ publishing {
                         ?: System.getenv("GITHUB_TOKEN")
             }
         }
-
     }
 }
 
@@ -189,4 +187,3 @@ if (project == rootProject) {
         }
     }
 }
-
