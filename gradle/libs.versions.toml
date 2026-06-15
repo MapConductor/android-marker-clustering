@@ -1,16 +1,19 @@
 [versions]
-agp = "8.10.1"
-kotlin = "2.2.21"
+agp = "9.2.1"
+kotlin = "2.4.0"
 
-compose = "1.8.1"
-composeBom = "2025.05.00"
-foundation = "1.10.2"
-coroutines = "1.7.3"
-ktLint = "13.1.0"
+compose = "1.11.2"
+composeBom = "2026.05.01"
+ktLint = "14.2.0"
+runtime = "1.11.2"
+coroutines = "1.11.0"
 
 junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+
+coreKtx = "1.19.0"
+foundation = "1.11.2"
 
 [libraries]
 # Jetpack Compose (with BOM)
