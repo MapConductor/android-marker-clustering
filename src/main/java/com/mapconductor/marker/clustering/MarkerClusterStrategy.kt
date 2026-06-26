@@ -168,7 +168,7 @@ class MarkerClusterStrategy<ActualMarker>(
                 // so that markers newly visible after a zoom-out are included in clustering.
                 val viewport =
                     currentCamera.visibleRegion?.bounds
-                        ?: estimateViewport(currentCamera.zoom)
+                        ?: estimateViewport(currentCamera.zoom, currentCamera.position)
                         ?: return@launch
                 val currentRenderer = lastRenderer ?: return@launch
                 enqueueRender(currentCamera, viewport, currentRenderer, token)
@@ -1265,37 +1265,43 @@ class MarkerClusterStrategy<ActualMarker>(
     }
 
     // Returns a viewport estimate for the given zoom level when the actual visibleRegion is
-    // unavailable. Scales the last known viewport around its center by 2^(zoomDelta) so that
-    // the estimated bounds cover the same screen-space area as the new zoom level.
-    private fun estimateViewport(zoom: Double): GeoRectBounds? {
+    // unavailable. Scales the last known viewport span by 2^(zoomDelta), but centers it on the
+    // current camera position so ArcGIS null-visibleRegion updates still render the viewed area.
+    private fun estimateViewport(
+        zoom: Double,
+        center: GeoPointInterface,
+    ): GeoRectBounds? {
         val base = lastKnownViewport ?: return null
         val baseZoom = lastKnownViewportZoom ?: return null
-        val zoomDelta = baseZoom - zoom
-        if (zoomDelta == 0.0) return base
         val sw = base.southWest ?: return base
         val ne = base.northEast ?: return base
-        val centerLat = (sw.latitude + ne.latitude) / 2.0
-        val centerLon = (sw.longitude + ne.longitude) / 2.0
+        val zoomDelta = baseZoom - zoom
         val scale = 2.0.pow(zoomDelta)
-        val halfLat = (ne.latitude - sw.latitude) / 2.0 * scale
-        val halfLon = (ne.longitude - sw.longitude) / 2.0 * scale
+        val centerPoint = GeoPoint.from(center).wrap()
+        val halfLat = kotlin.math.abs(ne.latitude - sw.latitude) / 2.0 * scale
+        val lonSpan = if (sw.longitude <= ne.longitude) {
+            ne.longitude - sw.longitude
+        } else {
+            ne.longitude + 360.0 - sw.longitude
+        }
+        val halfLon = lonSpan.coerceIn(0.0, 360.0) / 2.0 * scale
         val result = GeoRectBounds()
-        result
-            .extend(
-                GeoPoint(
-                    (centerLat - halfLat).coerceIn(-90.0, 90.0),
-                    (centerLon - halfLon).coerceIn(-180.0, 180.0),
-                ),
-            )
-        result
-            .extend(
-                GeoPoint(
-                    (centerLat + halfLat).coerceIn(-90.0, 90.0),
-                    (centerLon + halfLon).coerceIn(-180.0, 180.0),
-                ),
-            )
+        result.extend(
+            GeoPoint(
+                (centerPoint.latitude - halfLat).coerceIn(-90.0, 90.0),
+                wrapLongitude(centerPoint.longitude - halfLon),
+            ),
+        )
+        result.extend(
+            GeoPoint(
+                (centerPoint.latitude + halfLat).coerceIn(-90.0, 90.0),
+                wrapLongitude(centerPoint.longitude + halfLon),
+            ),
+        )
         return result
     }
+
+    private fun wrapLongitude(lon: Double): Double = ((lon + 540.0) % 360.0) - 180.0
 
     private fun effectiveClusterRadiusPx(zoom: Double): Double {
         // At low zoom levels, a fixed screen-space radius can represent hundreds of kilometers.
@@ -1430,7 +1436,7 @@ class MarkerClusterStrategy<ActualMarker>(
 
     companion object {
         const val DEFAULT_CLUSTER_RADIUS_PX: Double = 90.0
-        const val DEFAULT_MIN_CLUSTER_SIZE: Int = 5
+        const val DEFAULT_MIN_CLUSTER_SIZE: Int = 3
         const val DEFAULT_EXPAND_MARGIN: Double = 0.2
         const val DEFAULT_TILE_SIZE: Double = 256.0
         const val DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS: Long = 300L
