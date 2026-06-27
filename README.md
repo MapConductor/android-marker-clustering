@@ -6,8 +6,6 @@ MapConductor Marker Clustering provides a marker clustering strategy for the Map
 It automatically groups nearby markers into clusters as you zoom out, and expands them back into individual markers as you zoom in.
 It works with any map implementation (Google Maps, MapLibre, Mapbox, ArcGIS, HERE, etc.).
 
-For large datasets, clustering computation can optionally be offloaded to a native [WebAssembly](https://webassembly.org/) module running via [Chicory](https://github.com/dylibso/chicory) (pure-Java Wasm runtime, no JNI required).
-
 ## Setup
 
 https://docs-android.mapconductor.com/setup/
