@@ -1,6 +1,6 @@
 package com.mapconductor.marker.clustering
 
-import androidx.compose.ui.geometry.Offset
+import android.graphics.PointF
 import com.mapconductor.core.features.GeoPoint
 import com.mapconductor.core.features.GeoPointInterface
 import com.mapconductor.core.features.GeoRectBounds
@@ -449,7 +449,7 @@ class MarkerClusterStrategy<ActualMarker>(
                     val centroidProjected = polygonCentroidProjected(hull)
                     val centroid =
                         centroidProjected?.let { p ->
-                            geocell.projection.unproject(Offset(p.x.toFloat(), p.y.toFloat())).wrap()
+                            geocell.projection.unproject(PointF(p.x.toFloat(), p.y.toFloat())).wrap()
                         }
                     val initialCenter = GeoPoint.from(centroid ?: merged.center)
                     val center =
@@ -489,7 +489,7 @@ class MarkerClusterStrategy<ActualMarker>(
                             hullPoints =
                                 if (debugHullPolygons && hull.size >= 3) {
                                     hull.map { p ->
-                                        geocell.projection.unproject(Offset(p.x.toFloat(), p.y.toFloat())).wrap()
+                                        geocell.projection.unproject(PointF(p.x.toFloat(), p.y.toFloat())).wrap()
                                     }
                                 } else {
                                     emptyList()
