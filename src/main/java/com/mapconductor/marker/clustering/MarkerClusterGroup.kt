@@ -10,22 +10,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mapconductor.compose.MapViewScope
 import com.mapconductor.compose.map.LocalMapServiceRegistry
 import com.mapconductor.compose.map.LocalMapViewController
 import com.mapconductor.compose.marker.LocalMarkerCollector
+import com.mapconductor.compose.marker.Markers
+import com.mapconductor.compose.polygon.LocalPolygonCollector
 import com.mapconductor.core.marker.MarkerCollector
 import com.mapconductor.core.marker.MarkerIconInterface
 import com.mapconductor.core.marker.MarkerRenderingStrategyInterface
 import com.mapconductor.core.marker.MarkerRenderingSupport
 import com.mapconductor.core.marker.MarkerRenderingSupportKey
 import com.mapconductor.core.marker.MarkerState
-import com.mapconductor.compose.marker.Markers
 import com.mapconductor.core.marker.StrategyMarkerController
-import com.mapconductor.compose.polygon.LocalPolygonCollector
 import com.mapconductor.core.polygon.PolygonState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -103,9 +102,9 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
                                 PolygonState(
                                     id = "cluster-hull-${info.id}",
                                     points = info.hullPoints,
-                                    strokeColor = stroke.toArgb(),
-                                    strokeWidth = state.debugHullStrokeWidth.value,
-                                    fillColor = fill.toArgb(),
+                                    strokeColor = stroke,
+                                    strokeWidth = state.debugHullStrokeWidth,
+                                    fillColor = fill,
                                     geodesic = false,
                                     zIndex = 9,
                                     extra = null,
