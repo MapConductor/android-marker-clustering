@@ -8,6 +8,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -18,6 +19,7 @@ import com.mapconductor.compose.map.LocalMapViewController
 import com.mapconductor.compose.marker.LocalMarkerCollector
 import com.mapconductor.compose.marker.Markers
 import com.mapconductor.compose.polygon.LocalPolygonCollector
+import com.mapconductor.core.ChildCollector
 import com.mapconductor.core.marker.MarkerCollector
 import com.mapconductor.core.marker.MarkerIconInterface
 import com.mapconductor.core.marker.MarkerRenderingStrategyInterface
@@ -32,8 +34,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 
 @Composable
-fun <ActualMarker> MapViewScope.MarkerClusterGroup(
-    state: MarkerClusterGroupState<ActualMarker>,
+fun MapViewScope.MarkerClusterGroup(
+    state: MarkerClusterGroupState,
     markers: List<MarkerState>,
     content: @Composable () -> Unit = {},
 ) {
@@ -44,8 +46,8 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
 }
 
 @Composable
-fun <ActualMarker> MapViewScope.MarkerClusterGroup(
-    state: MarkerClusterGroupState<ActualMarker>,
+fun MapViewScope.MarkerClusterGroup(
+    state: MarkerClusterGroupState,
     content: @Composable () -> Unit,
 ) {
     val strategy =
@@ -58,11 +60,10 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
             state.enableZoomAnimation,
             state.enablePanAnimation,
             state.zoomAnimationDurationMillis,
-            state.debugHullPolygons,
             state.cameraIdleDebounceMillis,
             state.tileSize,
         ) {
-            MarkerClusterStrategy<ActualMarker>(
+            MarkerClusterStrategy(
                 clusterRadiusPx = state.clusterRadiusPx,
                 minClusterSize = state.minClusterSize,
                 expandMargin = state.expandMargin,
@@ -75,55 +76,94 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
                 cameraIdleDebounceMillis = state.cameraIdleDebounceMillis,
                 tileSize = state.tileSize,
             )
-        }
+    }
 
     MarkerRenderingGroup(strategy = strategy) {
-        if (state.debugHullPolygons) {
-            val polygonCollector = LocalPolygonCollector.current
-            val debugInfos by strategy.debugInfoFlow.collectAsState()
-            val colorsByCell = remember(debugInfos) { assignDistinctDebugColors(debugInfos) }
-            var activeHullIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+        val polygonCollector = LocalPolygonCollector.current
+        val debugInfos by strategy.debugInfoFlow.collectAsState()
+        var activeHullIds by remember(strategy, polygonCollector) { mutableStateOf<Set<String>>(emptySet()) }
+        val latestActiveHullIds by rememberUpdatedState(activeHullIds)
 
-            LaunchedEffect(
-                debugInfos,
-                state.debugHullStrokeWidth,
-                state.debugHullStrokeAlpha,
-                state.debugHullFillAlpha,
-            ) {
-                val nextStates =
-                    withContext(Dispatchers.Default) {
-                        debugInfos
-                            .asSequence()
-                            .filter { it.hullPoints.size >= 3 }
-                            .map { info ->
-                                val baseColor = colorsByCell[DebugCellKey(info.cellX, info.cellY)] ?: Color.Magenta
-                                val fill = baseColor.copy(alpha = state.debugHullFillAlpha)
-                                val stroke = baseColor.copy(alpha = state.debugHullStrokeAlpha)
-                                PolygonState(
-                                    id = "cluster-hull-${info.id}",
-                                    points = info.hullPoints,
-                                    strokeColor = stroke,
-                                    strokeWidth = state.debugHullStrokeWidth,
-                                    fillColor = fill,
-                                    geodesic = false,
-                                    zIndex = 9,
-                                    extra = null,
-                                    onClick = null,
-                                )
-                            }.toList()
-                    }
-
-                val nextIds = nextStates.map { it.id }.toSet()
-                (activeHullIds - nextIds).forEach { polygonCollector.remove(it) }
-                nextStates.forEach { polygonCollector.add(it) }
-                activeHullIds = nextIds
+        // When debug hull polygons are enabled, force a fresh cluster recompute so polygons
+        // reflect the current camera position rather than whatever the coverage-bounds cache holds.
+        LaunchedEffect(strategy, state.debugHullPolygons) {
+            if (state.debugHullPolygons) {
+                strategy.forceRender()
             }
+        }
 
-            DisposableEffect(Unit) {
-                onDispose {
-                    activeHullIds.forEach { polygonCollector.remove(it) }
-                    activeHullIds = emptySet()
+        LaunchedEffect(
+            strategy,
+            polygonCollector,
+            state.debugHullPolygons,
+            debugInfos,
+            state.debugHullStrokeWidth,
+            state.debugHullStrokeAlpha,
+            state.debugHullFillAlpha,
+        ) {
+            activeHullIds =
+                if (state.debugHullPolygons) {
+                    syncDebugHullPolygons(
+                        polygonCollector = polygonCollector,
+                        debugInfos = debugInfos,
+                        strokeWidth = state.debugHullStrokeWidth,
+                        strokeAlpha = state.debugHullStrokeAlpha,
+                        fillAlpha = state.debugHullFillAlpha,
+                        activeHullIds = activeHullIds,
+                    )
+                } else {
+                    removeDebugHullPolygons(polygonCollector, activeHullIds)
                 }
+        }
+
+        // Capture style values on the main thread so the background callback
+        // never reads Compose state off-thread. The DisposableEffect re-runs
+        // (installing a fresh callback) whenever the debug hull setting or style changes.
+        DisposableEffect(
+            strategy,
+            polygonCollector,
+            state.debugHullPolygons,
+            state.debugHullStrokeWidth,
+            state.debugHullStrokeAlpha,
+            state.debugHullFillAlpha,
+        ) {
+            if (state.debugHullPolygons) {
+                val strokeWidth = state.debugHullStrokeWidth
+                val strokeAlpha = state.debugHullStrokeAlpha
+                val fillAlpha = state.debugHullFillAlpha
+
+                strategy.onBeforeAnimation = { nextDebugInfos ->
+                    // Build polygon states on a background thread, then commit
+                    // them on the main thread — both complete before returning,
+                    // so updateRenderedMarkers() (animation) cannot start until
+                    // polygon add/remove operations are fully applied.
+                    activeHullIds =
+                        syncDebugHullPolygons(
+                            polygonCollector = polygonCollector,
+                            debugInfos = nextDebugInfos,
+                            strokeWidth = strokeWidth,
+                            strokeAlpha = strokeAlpha,
+                            fillAlpha = fillAlpha,
+                            activeHullIds = activeHullIds,
+                        )
+                }
+
+                onDispose {
+                    strategy.onBeforeAnimation = null
+                }
+            } else {
+                strategy.onBeforeAnimation = null
+
+                onDispose {
+                    strategy.onBeforeAnimation = null
+                }
+            }
+        }
+
+        DisposableEffect(strategy, polygonCollector) {
+            onDispose {
+                strategy.onBeforeAnimation = null
+                latestActiveHullIds.forEach { polygonCollector.remove(it) }
             }
         }
 
@@ -132,7 +172,7 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
 }
 
 @Composable
-fun <ActualMarker> MapViewScope.MarkerClusterGroup(
+fun MapViewScope.MarkerClusterGroup(
     clusterRadiusPx: Double = MarkerClusterStrategy.DEFAULT_CLUSTER_RADIUS_PX,
     minClusterSize: Int = MarkerClusterStrategy.DEFAULT_MIN_CLUSTER_SIZE,
     expandMargin: Double = MarkerClusterStrategy.DEFAULT_EXPAND_MARGIN,
@@ -154,7 +194,7 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
     markers: List<MarkerState>,
     content: @Composable () -> Unit = {},
 ) {
-    MarkerClusterGroup<ActualMarker> (
+    MarkerClusterGroup(
         clusterRadiusPx = clusterRadiusPx,
         minClusterSize = minClusterSize,
         expandMargin = expandMargin,
@@ -180,7 +220,7 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
 }
 
 @Composable
-fun <ActualMarker> MapViewScope.MarkerClusterGroup(
+fun MapViewScope.MarkerClusterGroup(
     clusterRadiusPx: Double = MarkerClusterStrategy.DEFAULT_CLUSTER_RADIUS_PX,
     minClusterSize: Int = MarkerClusterStrategy.DEFAULT_MIN_CLUSTER_SIZE,
     expandMargin: Double = MarkerClusterStrategy.DEFAULT_EXPAND_MARGIN,
@@ -222,7 +262,7 @@ fun <ActualMarker> MapViewScope.MarkerClusterGroup(
             cameraIdleDebounceMillis,
             tileSize,
         ) {
-            MarkerClusterGroupState<ActualMarker>(
+            MarkerClusterGroupState(
                 clusterRadiusPx = clusterRadiusPx,
                 minClusterSize = minClusterSize,
                 expandMargin = expandMargin,
@@ -246,6 +286,51 @@ private data class DebugCellKey(
     val x: Int,
     val y: Int,
 )
+
+private suspend fun syncDebugHullPolygons(
+    polygonCollector: ChildCollector<PolygonState>,
+    debugInfos: List<MarkerClusterDebugInfo>,
+    strokeWidth: Dp,
+    strokeAlpha: Float,
+    fillAlpha: Float,
+    activeHullIds: Set<String>,
+): Set<String> {
+    val nextStates =
+        withContext(Dispatchers.Default) {
+            val colorsByCell = assignDistinctDebugColors(debugInfos)
+            debugInfos
+                .filter { it.hullPoints.size >= 3 }
+                .map { info ->
+                    val base = colorsByCell[DebugCellKey(info.cellX, info.cellY)] ?: Color.Magenta
+                    PolygonState(
+                        id = "cluster-hull-${info.id}",
+                        points = info.hullPoints,
+                        strokeColor = base.copy(alpha = strokeAlpha),
+                        strokeWidth = strokeWidth,
+                        fillColor = base.copy(alpha = fillAlpha),
+                        geodesic = false,
+                        zIndex = 9,
+                        extra = null,
+                        onClick = null,
+                    )
+                }
+        }
+
+    return withContext(Dispatchers.Main) {
+        val nextIds = nextStates.map { it.id }.toSet()
+        (activeHullIds - nextIds).forEach { polygonCollector.remove(it) }
+        nextStates.forEach { polygonCollector.add(it) }
+        nextIds
+    }
+}
+
+private fun removeDebugHullPolygons(
+    polygonCollector: ChildCollector<PolygonState>,
+    activeHullIds: Set<String>,
+): Set<String> {
+    activeHullIds.forEach { polygonCollector.remove(it) }
+    return emptySet()
+}
 
 private fun assignDistinctDebugColors(infos: List<MarkerClusterDebugInfo>): Map<DebugCellKey, Color> {
     if (infos.isEmpty()) return emptyMap()
@@ -303,8 +388,8 @@ private fun assignDistinctDebugColors(infos: List<MarkerClusterDebugInfo>): Map<
 
 @OptIn(FlowPreview::class)
 @Composable
-private fun <ActualMarker> MarkerRenderingGroup(
-    strategy: MarkerRenderingStrategyInterface<ActualMarker>,
+private fun MarkerRenderingGroup(
+    strategy: MarkerRenderingStrategyInterface<Any>,
     content: @Composable () -> Unit,
 ) {
     val mapController = LocalMapViewController.current
@@ -313,7 +398,7 @@ private fun <ActualMarker> MarkerRenderingGroup(
 
     @Suppress("UNCHECKED_CAST")
     val renderingSupport =
-        services.get(MarkerRenderingSupportKey) as? MarkerRenderingSupport<ActualMarker> ?: return
+        services.get(MarkerRenderingSupportKey) as? MarkerRenderingSupport<Any> ?: return
     val markerCollector = remember { MarkerCollector() }
     val renderer =
         remember(mapController, strategy) {

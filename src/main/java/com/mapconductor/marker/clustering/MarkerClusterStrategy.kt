@@ -20,6 +20,7 @@ import com.mapconductor.core.projection.Earth
 import com.mapconductor.core.spherical.Spherical
 import com.mapconductor.core.spherical.expandBounds
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlin.math.cos
@@ -43,7 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
-class MarkerClusterStrategy<ActualMarker>(
+class MarkerClusterStrategy(
     private val clusterRadiusPx: Double = DEFAULT_CLUSTER_RADIUS_PX,
     private val minClusterSize: Int = DEFAULT_MIN_CLUSTER_SIZE,
     private val expandMargin: Double = DEFAULT_EXPAND_MARGIN,
@@ -53,13 +54,14 @@ class MarkerClusterStrategy<ActualMarker>(
     private val enableZoomAnimation: Boolean = false,
     private val enablePanAnimation: Boolean = false,
     private val zoomAnimationDurationMillis: Long = DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS,
-    private val debugHullPolygons: Boolean = false,
+    @Suppress("UNUSED_PARAMETER")
+    debugHullPolygons: Boolean = false,
     private val cameraIdleDebounceMillis: Long = DEFAULT_CAMERA_DEBOUNCE_MILLIS,
     private val tileSize: Double = DEFAULT_TILE_SIZE,
     semaphore: Semaphore = Semaphore(3),
     private val geocell: HexGeocellInterface = HexGeocell.defaultGeocell(),
-) : AbstractMarkerRenderingStrategy<ActualMarker>(semaphore) {
-    override val markerManager: MarkerManager<ActualMarker> = MarkerManager(geocell, 0)
+) : AbstractMarkerRenderingStrategy<Any>(semaphore) {
+    override val markerManager: MarkerManager<Any> = MarkerManager(geocell, 0)
     private val sourceStates = ConcurrentHashMap<String, MarkerState>()
     private val sourceStateVersion = AtomicLong(0)
     private var lastCameraPosition: MapCameraPosition? = null
@@ -69,15 +71,26 @@ class MarkerClusterStrategy<ActualMarker>(
     private var lastZoomKey: Int? = null
     private val debounceScope = CoroutineScope(Dispatchers.Default)
     private val cameraUpdateToken = AtomicLong(0)
-    private var lastRenderer: MarkerOverlayRendererInterface<ActualMarker>? = null
+    private var lastRenderer: MarkerOverlayRendererInterface<Any>? = null
     private var debounceJob: Job? = null
 
     @Volatile private var isRendering = false
-    private val renderRequests = Channel<RenderRequest<ActualMarker>>(Channel.CONFLATED)
+    private val renderRequests = Channel<RenderRequest<Any>>(Channel.CONFLATED)
     private var renderWorker: Job? = null
     private var lastRenderCameraPosition: MapCameraPosition? = null
     private val _debugInfoFlow = MutableStateFlow<List<MarkerClusterDebugInfo>>(emptyList())
     val debugInfoFlow: StateFlow<List<MarkerClusterDebugInfo>> = _debugInfoFlow
+    private var lastUsedViewport: GeoRectBounds? = null
+    private val forceNextRender = AtomicBoolean(false)
+
+    /**
+     * Called synchronously before marker animations start, after cluster computation.
+     * Set by [MarkerClusterGroup] to commit hull polygon updates before animations begin,
+     * so polygon rendering and marker animation cannot race each other.
+     */
+    @Volatile
+    var onBeforeAnimation: (suspend (List<MarkerClusterDebugInfo>) -> Unit)? = null
+
     private var lastClusterMemberCenters: Map<String, GeoPoint> = emptyMap()
     private var lastClusterPositions: Map<String, GeoPoint> = emptyMap()
     private var lastClusterAssignments: Map<String, String> = emptyMap()
@@ -85,7 +98,7 @@ class MarkerClusterStrategy<ActualMarker>(
     private var lastSourceStateVersion: Long = 0
     private var lastSourceFingerprints: Map<String, MarkerFingerPrint> = emptyMap()
     private var renderCount = 0
-    private val renderedMarkerEntities = mutableMapOf<String, MarkerEntityInterface<ActualMarker>>()
+    private val renderedMarkerEntities = mutableMapOf<String, MarkerEntityInterface<Any>>()
 
     override fun clear() {
         sourceStates.clear()
@@ -105,12 +118,29 @@ class MarkerClusterStrategy<ActualMarker>(
         lastRenderCameraPosition = null
         lastKnownViewport = null
         lastKnownViewportZoom = null
+        lastUsedViewport = null
+        forceNextRender.set(false)
+    }
+
+    /**
+     * Forces a full cluster recompute on the next render, bypassing the
+     * coverage-bounds early-return. Used by [MarkerClusterGroup] to ensure
+     * debug hull polygons reflect the current camera position immediately
+     * when [debugHullPolygons][MarkerClusterGroupState.debugHullPolygons]
+     * is enabled.
+     */
+    fun forceRender() {
+        forceNextRender.set(true)
+        val cameraPosition = lastCameraPosition ?: return
+        val viewport = lastKnownViewport ?: lastUsedViewport ?: return
+        val renderer = lastRenderer ?: return
+        enqueueRender(cameraPosition, viewport, renderer, cameraUpdateToken.incrementAndGet())
     }
 
     override suspend fun onAdd(
         data: List<MarkerState>,
         viewport: GeoRectBounds,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
     ): Boolean {
         // `renderClusters()` iterates `sourceStates` on a background worker.
         // Guard mutations with the same semaphore to avoid ConcurrentModificationException.
@@ -125,7 +155,7 @@ class MarkerClusterStrategy<ActualMarker>(
     override suspend fun onUpdate(
         state: MarkerState,
         viewport: GeoRectBounds,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
     ): Boolean {
         // Guard mutations with the same semaphore to avoid ConcurrentModificationException.
         semaphore.withPermit {
@@ -142,7 +172,7 @@ class MarkerClusterStrategy<ActualMarker>(
 
     override suspend fun onCameraChanged(
         cameraPosition: MapCameraPosition,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
     ) {
         lastCameraPosition = cameraPosition
         cameraPosition.visibleRegion?.bounds?.let {
@@ -178,7 +208,7 @@ class MarkerClusterStrategy<ActualMarker>(
     private fun enqueueRender(
         cameraPosition: MapCameraPosition,
         viewport: GeoRectBounds,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
         token: Long,
     ) {
         if (renderWorker == null) {
@@ -237,7 +267,7 @@ class MarkerClusterStrategy<ActualMarker>(
     private suspend fun renderClusters(
         cameraPosition: MapCameraPosition,
         viewport: GeoRectBounds,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
         token: Long,
     ) {
         semaphore.withPermit {
@@ -262,8 +292,11 @@ class MarkerClusterStrategy<ActualMarker>(
             val animateTransitions =
                 (enableZoomAnimation && zoomChanged) ||
                     (enablePanAnimation && cameraMoved)
+            val forced = forceNextRender.getAndSet(false)
+            lastUsedViewport = viewport
 
-            if (!zoomChanged &&
+            if (!forced &&
+                !zoomChanged &&
                 lastClusterCoverageBounds != null &&
                 containsBounds(lastClusterCoverageBounds!!, expandedBounds) &&
                 stableSource
@@ -487,7 +520,7 @@ class MarkerClusterStrategy<ActualMarker>(
                             cellX = cell.x,
                             cellY = cell.y,
                             hullPoints =
-                                if (debugHullPolygons && hull.size >= 3) {
+                                if (hull.size >= 3) {
                                     hull.map { p ->
                                         geocell.projection.unproject(Offset(p.x.toFloat(), p.y.toFloat())).wrap()
                                     }
@@ -534,6 +567,9 @@ class MarkerClusterStrategy<ActualMarker>(
             _debugInfoFlow.value = debugInfos
             val previousClusterMemberCenters = lastClusterMemberCenters
             val previousClusterPositions = lastClusterPositions
+            // Commit hull polygon updates synchronously before animation starts,
+            // so polygon rendering and marker animation cannot race each other.
+            onBeforeAnimation?.invoke(debugInfos)
             updateRenderedMarkers(
                 desiredStates = desiredMarkerStates,
                 renderer = renderer,
@@ -556,7 +592,7 @@ class MarkerClusterStrategy<ActualMarker>(
 
     private suspend fun updateRenderedMarkers(
         desiredStates: List<MarkerState>,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
         token: Long,
         animateTransitions: Boolean,
         previousClusterMemberCenters: Map<String, GeoPoint>,
@@ -668,12 +704,12 @@ class MarkerClusterStrategy<ActualMarker>(
             didImmediateChange = true
         }
 
-        val changeParams = mutableListOf<MarkerOverlayRendererInterface.ChangeParamsInterface<ActualMarker>>()
-        val changeEntities = mutableListOf<MarkerEntityInterface<ActualMarker>>()
+        val changeParams = mutableListOf<MarkerOverlayRendererInterface.ChangeParamsInterface<Any>>()
+        val changeEntities = mutableListOf<MarkerEntityInterface<Any>>()
 
         updateStates.forEach { state ->
             val prev = existingByIdAfterCleanup[state.id] ?: return@forEach
-            val nextEntity: MarkerEntityInterface<ActualMarker> =
+            val nextEntity: MarkerEntityInterface<Any> =
                 MarkerEntity(
                     marker = prev.marker,
                     state = state,
@@ -686,9 +722,9 @@ class MarkerClusterStrategy<ActualMarker>(
             }
 
             val change =
-                object : MarkerOverlayRendererInterface.ChangeParamsInterface<ActualMarker> {
-                    override val current: MarkerEntityInterface<ActualMarker> = nextEntity
-                    override val prev: MarkerEntityInterface<ActualMarker> = prev
+                object : MarkerOverlayRendererInterface.ChangeParamsInterface<Any> {
+                    override val current: MarkerEntityInterface<Any> = nextEntity
+                    override val prev: MarkerEntityInterface<Any> = prev
                     override val bitmapIcon =
                         state.icon?.toBitmapIcon() ?: defaultMarkerIcon
                 }
@@ -697,12 +733,12 @@ class MarkerClusterStrategy<ActualMarker>(
         }
 
         if (changeParams.isNotEmpty()) {
-            val actualMarkers = renderer.onChange(changeParams)
-            actualMarkers.forEachIndexed { index, actualMarker ->
-                actualMarker?.let {
-                    val entity: MarkerEntityInterface<ActualMarker> =
+            val Anys = renderer.onChange(changeParams)
+            Anys.forEachIndexed { index, Any ->
+                Any?.let {
+                    val entity: MarkerEntityInterface<Any> =
                         MarkerEntity(
-                            marker = it as ActualMarker,
+                            marker = it as Any,
                             state = changeEntities[index].state,
                             isRendered = true,
                         )
@@ -735,7 +771,7 @@ class MarkerClusterStrategy<ActualMarker>(
                 emptyList()
             }
 
-        val moves = mutableListOf<AnimatedMove<ActualMarker>>()
+        val moves = mutableListOf<AnimatedMove<Any>>()
         animatedAddEntries.forEach { entry ->
             val entity = markerManager.getEntity(entry.state.id) ?: return@forEach
             moves.add(
@@ -797,10 +833,10 @@ class MarkerClusterStrategy<ActualMarker>(
 
     private suspend fun addStatesToRenderer(
         states: List<MarkerState>,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
-    ): List<MarkerEntityInterface<ActualMarker>> {
+        renderer: MarkerOverlayRendererInterface<Any>,
+    ): List<MarkerEntityInterface<Any>> {
         if (states.isEmpty()) return emptyList()
-        val addedEntities = mutableListOf<MarkerEntityInterface<ActualMarker>>()
+        val addedEntities = mutableListOf<MarkerEntityInterface<Any>>()
         val addParams =
             states.map { state ->
                 object : MarkerOverlayRendererInterface.AddParamsInterface {
@@ -809,12 +845,12 @@ class MarkerClusterStrategy<ActualMarker>(
                         state.icon?.toBitmapIcon() ?: defaultMarkerIcon
                 }
             }
-        val actualMarkers = renderer.onAdd(addParams)
-        actualMarkers.forEachIndexed { index, actualMarker ->
-            val marker = actualMarker ?: return@forEachIndexed
-            val entity: MarkerEntityInterface<ActualMarker> =
+        val Anys = renderer.onAdd(addParams)
+        Anys.forEachIndexed { index, Any ->
+            val marker = Any ?: return@forEachIndexed
+            val entity: MarkerEntityInterface<Any> =
                 MarkerEntity(
-                    marker = marker as ActualMarker,
+                    marker = marker as Any,
                     state = addParams[index].state,
                     isRendered = true,
                 )
@@ -826,8 +862,8 @@ class MarkerClusterStrategy<ActualMarker>(
     }
 
     private suspend fun animateMarkerMoves(
-        moves: MutableList<AnimatedMove<ActualMarker>>,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        moves: MutableList<AnimatedMove<Any>>,
+        renderer: MarkerOverlayRendererInterface<Any>,
         durationMillis: Long,
         token: Long,
     ): Boolean {
@@ -849,9 +885,9 @@ class MarkerClusterStrategy<ActualMarker>(
             moves.map { move ->
                 move.baseState.icon?.toBitmapIcon() ?: defaultMarkerIcon
             }
-        val nextEntities = arrayOfNulls<MarkerEntityInterface<ActualMarker>>(moves.size)
+        val nextEntities = arrayOfNulls<MarkerEntityInterface<Any>>(moves.size)
         val changeParams =
-            ArrayList<MutableChangeParams<ActualMarker>>(moves.size).apply {
+            ArrayList<MutableChangeParams<Any>>(moves.size).apply {
                 moves.forEachIndexed { index, move ->
                     add(
                         MutableChangeParams(
@@ -882,11 +918,11 @@ class MarkerClusterStrategy<ActualMarker>(
                 changeParams[index].current = nextEntity
             }
 
-            val actualMarkers = renderer.onChange(changeParams)
-            actualMarkers.forEachIndexed { index, actualMarker ->
+            val Anys = renderer.onChange(changeParams)
+            Anys.forEachIndexed { index, Any ->
                 val nextEntity = nextEntities[index] ?: return@forEachIndexed
                 val fallbackMarker = nextEntity.marker
-                nextEntity.marker = actualMarker ?: fallbackMarker
+                nextEntity.marker = Any ?: fallbackMarker
                 markerManager.updateEntity(nextEntity)
                 renderedMarkerEntities[nextEntity.state.id] = nextEntity
                 moves[index].entity = nextEntity
@@ -945,11 +981,11 @@ class MarkerClusterStrategy<ActualMarker>(
 
     private suspend fun cleanupStaleMarkers(
         currentZoom: Double,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
         skipClusterRemoval: Boolean,
     ) {
         val currentZoomKey = currentZoom.roundToInt()
-        val staleEntities = mutableListOf<MarkerEntityInterface<ActualMarker>>()
+        val staleEntities = mutableListOf<MarkerEntityInterface<Any>>()
 
         renderedMarkerEntities.values.forEach { entity ->
             val id = entity.state.id
@@ -989,7 +1025,7 @@ class MarkerClusterStrategy<ActualMarker>(
 
     private suspend fun cleanupOrphanedMarkers(
         desiredStates: List<MarkerState>,
-        renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        renderer: MarkerOverlayRendererInterface<Any>,
     ) {
         val desiredIds = desiredStates.map { it.id }.toSet()
         val orphanedEntities =
@@ -1157,31 +1193,31 @@ class MarkerClusterStrategy<ActualMarker>(
         val start: GeoPoint,
     )
 
-    private data class AnimatedRemove<ActualMarker>(
-        val entity: MarkerEntityInterface<ActualMarker>,
+    private data class AnimatedRemove<Any>(
+        val entity: MarkerEntityInterface<Any>,
         val target: GeoPoint,
     )
 
-    private data class AnimatedMove<ActualMarker>(
+    private data class AnimatedMove<Any>(
         val id: String,
         val start: GeoPointInterface,
         val end: GeoPointInterface,
         val baseState: MarkerState,
-        var entity: MarkerEntityInterface<ActualMarker>,
+        var entity: MarkerEntityInterface<Any>,
     )
 
-    private data class RenderRequest<ActualMarker>(
+    private data class RenderRequest<Any>(
         val cameraPosition: MapCameraPosition,
         val viewport: GeoRectBounds,
-        val renderer: MarkerOverlayRendererInterface<ActualMarker>,
+        val renderer: MarkerOverlayRendererInterface<Any>,
         val token: Long,
     )
 
-    private class MutableChangeParams<ActualMarker>(
-        override var current: MarkerEntityInterface<ActualMarker>,
-        override var prev: MarkerEntityInterface<ActualMarker>,
+    private class MutableChangeParams<Any>(
+        override var current: MarkerEntityInterface<Any>,
+        override var prev: MarkerEntityInterface<Any>,
         override val bitmapIcon: BitmapIcon,
-    ) : MarkerOverlayRendererInterface.ChangeParamsInterface<ActualMarker>
+    ) : MarkerOverlayRendererInterface.ChangeParamsInterface<Any>
 
     private fun animationFrameMillis(moveCount: Int): Long =
         when {

@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mapconductor.core.marker.MarkerIconInterface
 
-class MarkerClusterGroupState<ActualMarker>(
+class MarkerClusterGroupState(
     clusterRadiusPx: Double = MarkerClusterStrategy.DEFAULT_CLUSTER_RADIUS_PX,
     minClusterSize: Int = MarkerClusterStrategy.DEFAULT_MIN_CLUSTER_SIZE,
     expandMargin: Double = MarkerClusterStrategy.DEFAULT_EXPAND_MARGIN,
