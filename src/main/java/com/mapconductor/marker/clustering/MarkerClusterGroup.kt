@@ -14,12 +14,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mapconductor.compose.MapViewScope
-import com.mapconductor.compose.map.LocalMapServiceRegistry
-import com.mapconductor.compose.map.LocalMapViewController
 import com.mapconductor.compose.marker.LocalMarkerCollector
 import com.mapconductor.compose.marker.Markers
 import com.mapconductor.compose.polygon.LocalPolygonCollector
 import com.mapconductor.core.ChildCollector
+import com.mapconductor.core.map.LocalMapServiceRegistry
+import com.mapconductor.core.map.LocalMapViewController
 import com.mapconductor.core.marker.MarkerCollector
 import com.mapconductor.core.marker.MarkerIconInterface
 import com.mapconductor.core.marker.MarkerRenderingStrategyInterface
@@ -401,7 +401,7 @@ private fun MarkerRenderingGroup(
         services.get(MarkerRenderingSupportKey) as? MarkerRenderingSupport<Any> ?: return
     val markerCollector = remember { MarkerCollector() }
     val renderer =
-        remember(mapController, strategy) {
+        remember(mapController) {
             renderingSupport.createMarkerRenderer(strategy)
         }
     val markerController =
