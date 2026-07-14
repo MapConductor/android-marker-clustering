@@ -548,7 +548,9 @@ class MarkerClusterStrategy(
                             draggable = false,
                             onClick =
                                 if (onClusterClick != null) {
-                                    { onClusterClick.invoke(cluster) }
+                                    {
+                                        onClusterClick.invoke(cluster)
+                                    }
                                 } else {
                                     null
                                 },
