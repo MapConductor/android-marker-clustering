@@ -37,9 +37,13 @@ import kotlinx.coroutines.withContext
 fun MapViewScope.MarkerClusterGroup(
     state: MarkerClusterGroupState,
     markers: List<MarkerState>,
+    trackMarkerUpdates: Boolean = true,
     content: @Composable () -> Unit = {},
 ) {
-    MarkerClusterGroup(state = state) {
+    MarkerClusterGroup(
+        state = state,
+        trackMarkerUpdates = trackMarkerUpdates,
+    ) {
         Markers(markers)
         content()
     }
@@ -48,6 +52,7 @@ fun MapViewScope.MarkerClusterGroup(
 @Composable
 fun MapViewScope.MarkerClusterGroup(
     state: MarkerClusterGroupState,
+    trackMarkerUpdates: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val strategy =
@@ -78,7 +83,10 @@ fun MapViewScope.MarkerClusterGroup(
             )
     }
 
-    MarkerRenderingGroup(strategy = strategy) {
+    MarkerRenderingGroup(
+        strategy = strategy,
+        trackMarkerUpdates = trackMarkerUpdates,
+    ) {
         val polygonCollector = LocalPolygonCollector.current
         val debugInfos by strategy.debugInfoFlow.collectAsState()
         var activeHullIds by remember(strategy, polygonCollector) { mutableStateOf<Set<String>>(emptySet()) }
@@ -390,6 +398,7 @@ private fun assignDistinctDebugColors(infos: List<MarkerClusterDebugInfo>): Map<
 @Composable
 private fun MarkerRenderingGroup(
     strategy: MarkerRenderingStrategyInterface<Any>,
+    trackMarkerUpdates: Boolean,
     content: @Composable () -> Unit,
 ) {
     val mapController = LocalMapViewController.current
@@ -424,13 +433,17 @@ private fun MarkerRenderingGroup(
         isRegistered = true
     }
 
-    DisposableEffect(markerCollector, markerController) {
-        markerCollector.setUpdateHandler { markerState ->
-            if (markerController.getEntity(markerState.id) != null) {
-                withContext(Dispatchers.Default) {
-                    markerController.update(markerState)
+    DisposableEffect(markerCollector, markerController, trackMarkerUpdates) {
+        if (trackMarkerUpdates) {
+            markerCollector.setUpdateHandler { markerState ->
+                if (markerController.getEntity(markerState.id) != null) {
+                    withContext(Dispatchers.Default) {
+                        markerController.update(markerState)
+                    }
                 }
             }
+        } else {
+            markerCollector.setUpdateHandler(null)
         }
         onDispose {
             markerCollector.setUpdateHandler(null)
