@@ -17,6 +17,7 @@ import com.mapconductor.compose.MapViewScope
 import com.mapconductor.compose.marker.LocalMarkerCollector
 import com.mapconductor.compose.marker.Markers
 import com.mapconductor.compose.polygon.LocalPolygonCollector
+import com.mapconductor.compose.polyline.LocalPolylineCollector
 import com.mapconductor.core.ChildCollector
 import com.mapconductor.core.map.LocalMapServiceRegistry
 import com.mapconductor.core.map.LocalMapViewController
@@ -28,6 +29,7 @@ import com.mapconductor.core.marker.MarkerRenderingSupportKey
 import com.mapconductor.core.marker.MarkerState
 import com.mapconductor.core.marker.StrategyMarkerController
 import com.mapconductor.core.polygon.PolygonState
+import com.mapconductor.core.polyline.PolylineState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.collectLatest
@@ -62,6 +64,11 @@ fun MapViewScope.MarkerClusterGroup(
             state.expandMargin,
             state.clusterIconProvider,
             state.onClusterClick,
+            state.prepareExpand,
+            state.spiderfyMinZoom,
+            state.spiderfyMarkerSizePx,
+            state.spiderfyMarkerMarginPx,
+            state.onSpiderfyChange,
             state.enableZoomAnimation,
             state.enablePanAnimation,
             state.zoomAnimationDurationMillis,
@@ -74,6 +81,11 @@ fun MapViewScope.MarkerClusterGroup(
                 expandMargin = state.expandMargin,
                 clusterIconProvider = state.clusterIconProvider,
                 onClusterClick = state.onClusterClick,
+                prepareExpand = state.prepareExpand,
+                spiderfyMinZoom = state.spiderfyMinZoom,
+                spiderfyMarkerSizePx = state.spiderfyMarkerSizePx,
+                spiderfyMarkerMarginPx = state.spiderfyMarkerMarginPx,
+                onSpiderfyChange = state.onSpiderfyChange,
                 enableZoomAnimation = state.enableZoomAnimation,
                 enablePanAnimation = state.enablePanAnimation,
                 zoomAnimationDurationMillis = state.zoomAnimationDurationMillis,
@@ -175,6 +187,43 @@ fun MapViewScope.MarkerClusterGroup(
             }
         }
 
+        // ── Spiderfy leg polylines ────────────────────────────────────────
+        // The strategy publishes the legs of the currently open fan (empty
+        // when collapsed); mirror them into the map's polyline collector.
+        val polylineCollector = LocalPolylineCollector.current
+        val spiderfyLegs by strategy.spiderfyLegsFlow.collectAsState()
+        var activeLegIds by remember(strategy, polylineCollector) { mutableStateOf<Set<String>>(emptySet()) }
+        val latestActiveLegIds by rememberUpdatedState(activeLegIds)
+
+        LaunchedEffect(
+            strategy,
+            polylineCollector,
+            spiderfyLegs,
+            state.spiderfyLegColor,
+            state.spiderfyLegWidth,
+        ) {
+            val nextIds = spiderfyLegs.map { it.id }.toSet()
+            (activeLegIds - nextIds).forEach { polylineCollector.remove(it) }
+            spiderfyLegs.forEach { leg ->
+                polylineCollector.add(
+                    PolylineState(
+                        points = listOf(leg.start, leg.end),
+                        id = leg.id,
+                        strokeColor = state.spiderfyLegColor,
+                        strokeWidth = state.spiderfyLegWidth,
+                        geodesic = false,
+                    ),
+                )
+            }
+            activeLegIds = nextIds
+        }
+
+        DisposableEffect(strategy, polylineCollector) {
+            onDispose {
+                latestActiveLegIds.forEach { polylineCollector.remove(it) }
+            }
+        }
+
         content()
     }
 }
@@ -186,6 +235,13 @@ fun MapViewScope.MarkerClusterGroup(
     expandMargin: Double = MarkerClusterStrategy.DEFAULT_EXPAND_MARGIN,
     clusterIconProvider: (Int) -> MarkerIconInterface = MarkerClusterStrategy.DEFAULT_ICON_PROVIDER,
     onClusterClick: ((MarkerCluster) -> Unit)? = null,
+    prepareExpand: (suspend (List<MarkerState>) -> Unit)? = null,
+    spiderfyMinZoom: Double? = null,
+    spiderfyMarkerSizePx: Double = MarkerClusterStrategy.DEFAULT_SPIDERFY_MARKER_SIZE_PX,
+    spiderfyMarkerMarginPx: Double = MarkerClusterStrategy.DEFAULT_SPIDERFY_MARKER_MARGIN_PX,
+    spiderfyLegColor: Color = Color(0xFF666666),
+    spiderfyLegWidth: Dp = 1.5.dp,
+    onSpiderfyChange: ((Boolean) -> Unit)? = null,
     clusterRadiusStrokeColor: Color = Color.Red,
     clusterRadiusStrokeWidth: Dp = 1.dp,
     clusterRadiusFillColor: Color = Color.Transparent,
@@ -208,6 +264,13 @@ fun MapViewScope.MarkerClusterGroup(
         expandMargin = expandMargin,
         clusterIconProvider = clusterIconProvider,
         onClusterClick = onClusterClick,
+        prepareExpand = prepareExpand,
+        spiderfyMinZoom = spiderfyMinZoom,
+        spiderfyMarkerSizePx = spiderfyMarkerSizePx,
+        spiderfyMarkerMarginPx = spiderfyMarkerMarginPx,
+        spiderfyLegColor = spiderfyLegColor,
+        spiderfyLegWidth = spiderfyLegWidth,
+        onSpiderfyChange = onSpiderfyChange,
         clusterRadiusStrokeColor = clusterRadiusStrokeColor,
         clusterRadiusStrokeWidth = clusterRadiusStrokeWidth,
         clusterRadiusFillColor = clusterRadiusFillColor,
@@ -234,6 +297,13 @@ fun MapViewScope.MarkerClusterGroup(
     expandMargin: Double = MarkerClusterStrategy.DEFAULT_EXPAND_MARGIN,
     clusterIconProvider: (Int) -> MarkerIconInterface = MarkerClusterStrategy.DEFAULT_ICON_PROVIDER,
     onClusterClick: ((MarkerCluster) -> Unit)? = null,
+    prepareExpand: (suspend (List<MarkerState>) -> Unit)? = null,
+    spiderfyMinZoom: Double? = null,
+    spiderfyMarkerSizePx: Double = MarkerClusterStrategy.DEFAULT_SPIDERFY_MARKER_SIZE_PX,
+    spiderfyMarkerMarginPx: Double = MarkerClusterStrategy.DEFAULT_SPIDERFY_MARKER_MARGIN_PX,
+    spiderfyLegColor: Color = Color(0xFF666666),
+    spiderfyLegWidth: Dp = 1.5.dp,
+    onSpiderfyChange: ((Boolean) -> Unit)? = null,
     clusterRadiusStrokeColor: Color = Color.Red,
     clusterRadiusStrokeWidth: Dp = 1.dp,
     clusterRadiusFillColor: Color = Color.Transparent,
@@ -256,6 +326,13 @@ fun MapViewScope.MarkerClusterGroup(
             expandMargin,
             clusterIconProvider,
             onClusterClick,
+            prepareExpand,
+            spiderfyMinZoom,
+            spiderfyMarkerSizePx,
+            spiderfyMarkerMarginPx,
+            spiderfyLegColor,
+            spiderfyLegWidth,
+            onSpiderfyChange,
             clusterRadiusStrokeColor,
             clusterRadiusStrokeWidth,
             clusterRadiusFillColor,
@@ -276,6 +353,13 @@ fun MapViewScope.MarkerClusterGroup(
                 expandMargin = expandMargin,
                 clusterIconProvider = clusterIconProvider,
                 onClusterClick = onClusterClick,
+                prepareExpand = prepareExpand,
+                spiderfyMinZoom = spiderfyMinZoom,
+                spiderfyMarkerSizePx = spiderfyMarkerSizePx,
+                spiderfyMarkerMarginPx = spiderfyMarkerMarginPx,
+                spiderfyLegColor = spiderfyLegColor,
+                spiderfyLegWidth = spiderfyLegWidth,
+                onSpiderfyChange = onSpiderfyChange,
                 enableZoomAnimation = enableZoomAnimation,
                 enablePanAnimation = enablePanAnimation,
                 zoomAnimationDurationMillis = zoomAnimationDurationMillis,

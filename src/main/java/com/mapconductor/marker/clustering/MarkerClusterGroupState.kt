@@ -3,9 +3,11 @@ package com.mapconductor.marker.clustering
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mapconductor.core.marker.MarkerIconInterface
+import com.mapconductor.core.marker.MarkerState
 
 class MarkerClusterGroupState(
     clusterRadiusPx: Double = MarkerClusterStrategy.DEFAULT_CLUSTER_RADIUS_PX,
@@ -13,6 +15,13 @@ class MarkerClusterGroupState(
     expandMargin: Double = MarkerClusterStrategy.DEFAULT_EXPAND_MARGIN,
     clusterIconProvider: (Int) -> MarkerIconInterface = MarkerClusterStrategy.DEFAULT_ICON_PROVIDER,
     onClusterClick: ((MarkerCluster) -> Unit)? = null,
+    prepareExpand: (suspend (List<MarkerState>) -> Unit)? = null,
+    spiderfyMinZoom: Double? = null,
+    spiderfyMarkerSizePx: Double = MarkerClusterStrategy.DEFAULT_SPIDERFY_MARKER_SIZE_PX,
+    spiderfyMarkerMarginPx: Double = MarkerClusterStrategy.DEFAULT_SPIDERFY_MARKER_MARGIN_PX,
+    spiderfyLegColor: Color = Color(0xFF666666),
+    spiderfyLegWidth: Dp = 1.5.dp,
+    onSpiderfyChange: ((Boolean) -> Unit)? = null,
     debugClusterTurnLabel: Boolean = false,
     enableZoomAnimation: Boolean = false,
     enablePanAnimation: Boolean = false,
@@ -29,6 +38,13 @@ class MarkerClusterGroupState(
     var expandMargin by mutableStateOf(expandMargin)
     var clusterIconProvider by mutableStateOf(clusterIconProvider)
     var onClusterClick by mutableStateOf(onClusterClick)
+    var prepareExpand by mutableStateOf(prepareExpand)
+    var spiderfyMinZoom by mutableStateOf(spiderfyMinZoom)
+    var spiderfyMarkerSizePx by mutableStateOf(spiderfyMarkerSizePx)
+    var spiderfyMarkerMarginPx by mutableStateOf(spiderfyMarkerMarginPx)
+    var spiderfyLegColor by mutableStateOf(spiderfyLegColor)
+    var spiderfyLegWidth by mutableStateOf(spiderfyLegWidth)
+    var onSpiderfyChange by mutableStateOf(onSpiderfyChange)
     var debugClusterTurnLabel by mutableStateOf(debugClusterTurnLabel)
     var enableZoomAnimation by mutableStateOf(enableZoomAnimation)
     var enablePanAnimation by mutableStateOf(enablePanAnimation)

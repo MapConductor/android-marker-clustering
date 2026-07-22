@@ -22,15 +22,18 @@ import com.mapconductor.core.spherical.expandBounds
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,8 +44,11 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 class MarkerClusterStrategy(
     private val clusterRadiusPx: Double = DEFAULT_CLUSTER_RADIUS_PX,
@@ -51,6 +57,34 @@ class MarkerClusterStrategy(
     private val clusterIconProvider: (Int) -> MarkerIconInterface = DEFAULT_ICON_PROVIDER,
     private val clusterIconProviderWithTurn: ((Int, Int) -> MarkerIconInterface)? = null,
     private val onClusterClick: ((MarkerCluster) -> Unit)? = null,
+    /**
+     * Called before newly appearing individual (non-cluster) markers are
+     * rendered — e.g. when a cluster expands after a zoom. Applying the new
+     * cluster state is deferred until this suspend function returns, so the
+     * app can preload marker icon images (and show a loading indicator)
+     * before the markers pop in. A newer recluster supersedes any pending
+     * deferred apply.
+     */
+    private val prepareExpand: (suspend (List<MarkerState>) -> Unit)? = null,
+    /**
+     * At or above this zoom, clicking a cluster fans its members out around
+     * the (kept) cluster marker, connected by leg polylines — useful when
+     * multiple markers share the same location and can never be separated by
+     * zooming. Clicking the same cluster again, or any recluster (camera
+     * move / data change), collapses the fan. Below this zoom the click
+     * falls through to [onClusterClick]. Null disables the feature.
+     */
+    private val spiderfyMinZoom: Double? = null,
+    /** Marker diameter in px used by the overlap-avoiding spiderfy layout. */
+    private val spiderfyMarkerSizePx: Double = DEFAULT_SPIDERFY_MARKER_SIZE_PX,
+    /** Extra gap between fanned-out markers in px. */
+    private val spiderfyMarkerMarginPx: Double = DEFAULT_SPIDERFY_MARKER_MARGIN_PX,
+    /**
+     * Called when a spiderfy fan opens (true) or collapses (false) — e.g. to
+     * close an info bubble when the user clicks another cluster or the fan
+     * is dismissed by a camera move. Invoked on the main thread.
+     */
+    private val onSpiderfyChange: ((Boolean) -> Unit)? = null,
     private val enableZoomAnimation: Boolean = false,
     private val enablePanAnimation: Boolean = false,
     private val zoomAnimationDurationMillis: Long = DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS,
@@ -98,7 +132,24 @@ class MarkerClusterStrategy(
     private var lastSourceStateVersion: Long = 0
     private var lastSourceFingerprints: Map<String, MarkerFingerPrint> = emptyMap()
     private var renderCount = 0
-    private val renderedMarkerEntities = mutableMapOf<String, MarkerEntityInterface<Any>>()
+
+    // ConcurrentHashMap: mutated by the render worker, also read from the
+    // click (main) thread when collecting spiderfy obstacles.
+    private val renderedMarkerEntities = ConcurrentHashMap<String, MarkerEntityInterface<Any>>()
+
+    // ── Spiderfy (click-to-fan-out) state ─────────────────────────────────
+    private val _spiderfyLegsFlow = MutableStateFlow<List<SpiderfyLeg>>(emptyList())
+
+    /**
+     * Leg polylines of the currently open spiderfy fan (empty when no fan is
+     * open). [MarkerClusterGroup] observes this to draw the leg polylines.
+     */
+    val spiderfyLegsFlow: StateFlow<List<SpiderfyLeg>> = _spiderfyLegsFlow
+    private val spiderfyMutex = Mutex()
+    private val spiderfyToken = AtomicLong(0)
+
+    @Volatile private var spiderfyClusterKey: String? = null
+    private val spiderfyEntities = mutableListOf<MarkerEntityInterface<Any>>()
 
     override fun clear() {
         sourceStates.clear()
@@ -120,6 +171,10 @@ class MarkerClusterStrategy(
         lastKnownViewportZoom = null
         lastUsedViewport = null
         forceNextRender.set(false)
+        spiderfyToken.incrementAndGet()
+        spiderfyClusterKey = null
+        spiderfyEntities.clear()
+        _spiderfyLegsFlow.value = emptyList()
     }
 
     /**
@@ -294,6 +349,13 @@ class MarkerClusterStrategy(
                     (enablePanAnimation && cameraMoved)
             val forced = forceNextRender.getAndSet(false)
             lastUsedViewport = viewport
+
+            // Any recluster (camera move / data change) collapses an open
+            // spiderfy fan and supersedes a pending fan open.
+            spiderfyToken.incrementAndGet()
+            spiderfyMutex.withLock {
+                collapseSpiderfyLocked(renderer)
+            }
 
             if (!forced &&
                 !zoomChanged &&
@@ -478,26 +540,23 @@ class MarkerClusterStrategy(
             finalMergedClusters.forEach { merged ->
                 currentCoroutineContext().ensureActive()
                 if (merged.members.size >= minClusterSize) {
+                    // Compute centroid via convex-hull shoelace formula (in projected space).
+                    // Degenerate hulls (all members at nearly the same point) fall back
+                    // to the member average, so a same-venue cluster is rendered exactly
+                    // at that venue rather than at the first member / a cached position.
                     val hull = convexHullProjected(merged.members)
                     val centroidProjected = polygonCentroidProjected(hull)
                     val centroid =
                         centroidProjected?.let { p ->
                             geocell.projection.unproject(Offset(p.x.toFloat(), p.y.toFloat())).wrap()
                         }
-                    val initialCenter = GeoPoint.from(centroid ?: merged.center)
-                    val center =
-                        if (!zoomChanged && stableSource) {
-                            val (cx, cy) = projectToPixel(initialCenter, zoom, tileSize)
-                            val cell =
-                                ClusterCell(
-                                    x = floor(cx / effectiveRadiusPx).toInt(),
-                                    y = floor(cy / effectiveRadiusPx).toInt(),
-                                )
-                            val clusterId = buildClusterId(cell, zoom)
-                            lastClusterPositions[clusterId] ?: initialCenter
-                        } else {
-                            initialCenter
-                        }
+
+                    // The rendered center is recomputed from the CURRENT members on
+                    // every recluster (camera idle). Membership-stable pans therefore
+                    // yield the identical centroid — no flicker — while membership
+                    // changes move the cluster to its true center instead of freezing
+                    // it at a stale cached position.
+                    val center = GeoPoint.from(centroid ?: averagePosition(merged.members))
                     val (cx, cy) = projectToPixel(center, zoom, tileSize)
                     val cell =
                         ClusterCell(
@@ -538,18 +597,23 @@ class MarkerClusterStrategy(
                     val clusterIcon =
                         clusterIconProviderWithTurn?.invoke(merged.members.size, turn)
                             ?: clusterIconProvider(merged.members.size)
+                    // Cluster clicks first try spiderfy (when configured and
+                    // zoomed in enough), then fall through to onClusterClick.
+                    val clusterClickable = onClusterClick != null || spiderfyMinZoom != null
                     val clusterState =
                         MarkerState(
                             id = clusterId,
                             position = center,
                             extra = cluster,
                             icon = clusterIcon,
-                            clickable = onClusterClick != null,
+                            clickable = clusterClickable,
                             draggable = false,
                             onClick =
-                                if (onClusterClick != null) {
+                                if (clusterClickable) {
                                     {
-                                        onClusterClick.invoke(cluster)
+                                        if (!tryToggleSpiderfy(cluster)) {
+                                            onClusterClick?.invoke(cluster)
+                                        }
                                     }
                                 } else {
                                     null
@@ -567,6 +631,29 @@ class MarkerClusterStrategy(
 
             if (token != cameraUpdateToken.get()) return@withPermit
             _debugInfoFlow.value = debugInfos
+
+            // Keep the current (clustered) rendering on screen until the app
+            // finishes preparing the newly appearing individual markers
+            // (e.g. icon preloading). A newer camera update supersedes this
+            // deferred apply via the token check below.
+            val prepare = prepareExpand
+            if (prepare != null) {
+                val appearing =
+                    desiredMarkerStates.filter { state ->
+                        !state.id.startsWith("cluster_") && !renderedMarkerEntities.containsKey(state.id)
+                    }
+                if (appearing.isNotEmpty()) {
+                    try {
+                        prepare(appearing)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        // A failed prepare must not block rendering.
+                    }
+                    if (token != cameraUpdateToken.get()) return@withPermit
+                }
+            }
+
             val previousClusterMemberCenters = lastClusterMemberCenters
             val previousClusterPositions = lastClusterPositions
             // Commit hull polygon updates synchronously before animation starts,
@@ -1045,6 +1132,252 @@ class MarkerClusterStrategy(
         }
     }
 
+    // ── Spiderfy (click-to-fan-out) ───────────────────────────────────────
+
+    /**
+     * Handles a click on a cluster marker. Returns true when the click was
+     * consumed by spiderfy (toggling the fan), false when it should fall
+     * through to [onClusterClick]. Runs on the caller (main) thread; the
+     * actual rendering is performed asynchronously.
+     */
+    private fun tryToggleSpiderfy(cluster: MarkerCluster): Boolean {
+        val minZoom = spiderfyMinZoom ?: return false
+        val camera = lastCameraPosition ?: return false
+        if (camera.zoom < minZoom) return false
+        val renderer = lastRenderer ?: return false
+        val holder = renderer.holder
+
+        val clusterKey = cluster.markerIds.sorted().joinToString(",")
+        if (spiderfyClusterKey == clusterKey) {
+            // Clicking the open cluster again collapses the fan.
+            spiderfyToken.incrementAndGet()
+            debounceScope.launch {
+                spiderfyMutex.withLock {
+                    collapseSpiderfyLocked(renderer)
+                }
+            }
+            return true
+        }
+
+        val members = cluster.markerIds.mapNotNull { sourceStates[it] }
+        if (members.isEmpty()) return false
+
+        // Fan out around the cluster marker's actual rendered position (it can
+        // deviate from the member average), so the legs meet the marker's base.
+        var centerGeo = averagePosition(members)
+        renderedMarkerEntities.values.firstOrNull { it.state.extra === cluster }?.let { entity ->
+            centerGeo = GeoPoint.from(entity.state.position)
+        }
+        val centerPx = holder.toScreenOffset(centerGeo) ?: return false
+
+        // Already rendered output markers (other clusters / individual markers)
+        // near the fan act as fixed obstacles so the fanned members do not
+        // overlap them. The clicked cluster itself (at the center) is excluded;
+        // instead the head of a pin-shaped cluster icon is added as a pseudo
+        // obstacle above the center.
+        val obstacles = mutableListOf<Offset>()
+        renderedMarkerEntities.values.forEach { entity ->
+            val px = holder.toScreenOffset(entity.state.position) ?: return@forEach
+            val relX = px.x - centerPx.x
+            val relY = px.y - centerPx.y
+            val distance = hypot(relX.toDouble(), relY.toDouble())
+            // Ignore the clicked cluster itself and anything too far away.
+            if (distance < 2.0 || distance > 300.0) return@forEach
+            obstacles.add(Offset(relX, relY))
+        }
+        obstacles.add(Offset(0f, -(spiderfyMarkerSizePx / 2.0).roundToInt().toFloat()))
+
+        val offsets = spiderfyLayout(members.size, spiderfyMarkerSizePx, spiderfyMarkerMarginPx, obstacles)
+        val token = spiderfyToken.incrementAndGet()
+        debounceScope.launch {
+            spiderfyMutex.withLock {
+                collapseSpiderfyLocked(renderer)
+            }
+            if (token != spiderfyToken.get()) return@launch
+            openSpiderfy(
+                clusterKey = clusterKey,
+                members = members,
+                centerGeo = centerGeo,
+                centerPx = centerPx,
+                offsets = offsets,
+                renderer = renderer,
+                token = token,
+            )
+        }
+        return true
+    }
+
+    private suspend fun openSpiderfy(
+        clusterKey: String,
+        members: List<MarkerState>,
+        centerGeo: GeoPoint,
+        centerPx: Offset,
+        offsets: List<Offset>,
+        renderer: MarkerOverlayRendererInterface<Any>,
+        token: Long,
+    ) {
+        val holder = renderer.holder
+        val clones = mutableListOf<MarkerState>()
+        val legs = mutableListOf<SpiderfyLeg>()
+        withContext(Dispatchers.Main) {
+            members.forEachIndexed { index, member ->
+                val screen =
+                    Offset(
+                        x = centerPx.x + offsets[index].x,
+                        y = centerPx.y + offsets[index].y,
+                    )
+                val geo =
+                    holder.fromScreenOffsetSync(screen)
+                        ?: holder.fromScreenOffset(screen)
+                        ?: return@forEachIndexed
+                clones.add(member.copy(id = "spider_${member.id}", position = geo, zIndex = 2000))
+                legs.add(SpiderfyLeg(id = "spiderleg_${member.id}", start = centerGeo, end = geo))
+            }
+        }
+        if (clones.isEmpty()) return
+
+        // Keep the cluster rendering unchanged until the app has prepared the
+        // fanned-out markers (e.g. icon preloading). A newer toggle/recluster
+        // supersedes this open via the token check below.
+        val prepare = prepareExpand
+        if (prepare != null) {
+            try {
+                prepare(clones)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // A failed prepare must not block rendering.
+            }
+        }
+
+        spiderfyMutex.withLock {
+            if (token != spiderfyToken.get()) return
+            val addParams =
+                clones.map { state ->
+                    object : MarkerOverlayRendererInterface.AddParamsInterface {
+                        override val state: MarkerState = state
+                        override val bitmapIcon =
+                            state.icon?.toBitmapIcon() ?: defaultMarkerIcon
+                    }
+                }
+            val actualMarkers = renderer.onAdd(addParams)
+            actualMarkers.forEachIndexed { index, actual ->
+                val marker = actual ?: return@forEachIndexed
+                val entity: MarkerEntityInterface<Any> =
+                    MarkerEntity(
+                        marker = marker,
+                        state = addParams[index].state,
+                        isRendered = true,
+                    )
+                markerManager.registerEntity(entity)
+                spiderfyEntities.add(entity)
+            }
+            renderer.onPostProcess()
+            _spiderfyLegsFlow.value = legs
+            spiderfyClusterKey = clusterKey
+        }
+        withContext(Dispatchers.Main) {
+            onSpiderfyChange?.invoke(true)
+        }
+    }
+
+    /** Must be called while holding [spiderfyMutex]. */
+    private suspend fun collapseSpiderfyLocked(renderer: MarkerOverlayRendererInterface<Any>) {
+        if (spiderfyClusterKey == null && spiderfyEntities.isEmpty()) return
+        spiderfyClusterKey = null
+        _spiderfyLegsFlow.value = emptyList()
+        if (spiderfyEntities.isNotEmpty()) {
+            val entities = spiderfyEntities.toList()
+            spiderfyEntities.clear()
+            renderer.onRemove(entities)
+            entities.forEach { entity ->
+                markerManager.removeEntity(entity.state.id)
+            }
+            renderer.onPostProcess()
+        }
+        withContext(Dispatchers.Main) {
+            onSpiderfyChange?.invoke(false)
+        }
+    }
+
+    /**
+     * Screen-space fan-out layout for spiderfy. Members start on an even circle
+     * around the cluster and then iteratively repel each other (and the cluster
+     * marker itself) until no pair is closer than markerSize + margin, while a
+     * weak spring toward the center keeps the fan compact. Converges to a ring
+     * for small counts and to packed shells for larger ones.
+     */
+    private fun spiderfyLayout(
+        count: Int,
+        markerSizePx: Double,
+        marginPx: Double,
+        obstacles: List<Offset>,
+    ): List<Offset> {
+        val desired = markerSizePx + marginPx
+        // Base distance from the cluster center: far enough for the legs to be
+        // visible, close enough for the fan to stay compact.
+        val centerClearance = (markerSizePx * 1.3).roundToInt() + marginPx
+        val xs = DoubleArray(count)
+        val ys = DoubleArray(count)
+        for (i in 0 until count) {
+            // Evenly spaced starting at 0 degrees (to the right); two members
+            // end up side by side, avoiding the head of a pin-shaped cluster.
+            val angle = 2.0 * PI * i / count
+            xs[i] = cos(angle) * centerClearance
+            ys[i] = sin(angle) * centerClearance
+        }
+        for (iteration in 0 until SPIDERFY_LAYOUT_MAX_ITERATIONS) {
+            var maxMove = 0.0
+            for (i in 0 until count) {
+                var fx = 0.0
+                var fy = 0.0
+                // Repulsion between fanned-out members.
+                for (j in 0 until count) {
+                    if (i == j) continue
+                    val dx = xs[i] - xs[j]
+                    val dy = ys[i] - ys[j]
+                    var d = hypot(dx, dy)
+                    if (d == 0.0) d = 0.01
+                    if (d < desired) {
+                        val push = (desired - d) / 2.0
+                        fx += dx / d * push
+                        fy += dy / d * push
+                    }
+                }
+                // Repulsion from already rendered markers nearby (fixed obstacles).
+                for (obstacle in obstacles) {
+                    val dx = xs[i] - obstacle.x
+                    val dy = ys[i] - obstacle.y
+                    var d = hypot(dx, dy)
+                    if (d == 0.0) d = 0.01
+                    if (d < desired) {
+                        val push = desired - d
+                        fx += dx / d * push
+                        fy += dy / d * push
+                    }
+                }
+                var dc = hypot(xs[i], ys[i])
+                if (dc == 0.0) dc = 0.01
+                if (dc < centerClearance) {
+                    // Repulsion from the cluster marker itself.
+                    val push = centerClearance - dc
+                    fx += xs[i] / dc * push
+                    fy += ys[i] / dc * push
+                } else {
+                    // Weak spring toward the center (prevents drifting too far).
+                    val pull = (dc - centerClearance) * 0.15
+                    fx -= xs[i] / dc * pull
+                    fy -= ys[i] / dc * pull
+                }
+                xs[i] += fx * 0.6
+                ys[i] += fy * 0.6
+                maxMove = max(maxMove, max(abs(fx), abs(fy)))
+            }
+            if (maxMove < SPIDERFY_LAYOUT_CONVERGENCE_THRESHOLD) break
+        }
+        return List(count) { i -> Offset(xs[i].toFloat(), ys[i].toFloat()) }
+    }
+
     private fun buildClusterId(
         cell: ClusterCell,
         zoom: Double,
@@ -1479,6 +1812,10 @@ class MarkerClusterStrategy(
         const val DEFAULT_TILE_SIZE: Double = 256.0
         const val DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS: Long = 300L
         const val DEFAULT_CAMERA_DEBOUNCE_MILLIS: Long = 100L
+        const val DEFAULT_SPIDERFY_MARKER_SIZE_PX: Double = 52.0
+        const val DEFAULT_SPIDERFY_MARKER_MARGIN_PX: Double = 8.0
+        private const val SPIDERFY_LAYOUT_MAX_ITERATIONS: Int = 150
+        private const val SPIDERFY_LAYOUT_CONVERGENCE_THRESHOLD: Double = 0.15
         private const val MAX_DENSE_CELLS: Int = 4
         private const val MAX_DENSE_CANDIDATES: Int = 50
         private const val PAN_ANIMATION_MIN_DISTANCE_METERS: Double = 1.0

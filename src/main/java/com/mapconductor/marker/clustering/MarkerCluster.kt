@@ -17,3 +17,13 @@ data class MarkerClusterDebugInfo(
     val cellY: Int,
     val hullPoints: List<GeoPointInterface> = emptyList(),
 )
+
+/**
+ * A leg polyline of an open spiderfy fan, connecting the cluster marker
+ * ([start]) to one fanned-out member marker ([end]).
+ */
+data class SpiderfyLeg(
+    val id: String,
+    val start: GeoPointInterface,
+    val end: GeoPointInterface,
+)
