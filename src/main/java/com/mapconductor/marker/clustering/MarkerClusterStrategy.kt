@@ -12,6 +12,7 @@ import com.mapconductor.core.marker.BitmapIcon
 import com.mapconductor.core.marker.ColorDefaultIcon
 import com.mapconductor.core.marker.MarkerEntity
 import com.mapconductor.core.marker.MarkerEntityInterface
+import com.mapconductor.core.marker.MarkerFingerPrint
 import com.mapconductor.core.marker.MarkerIconInterface
 import com.mapconductor.core.marker.MarkerManager
 import com.mapconductor.core.marker.MarkerOverlayRendererInterface
@@ -97,6 +98,12 @@ class MarkerClusterStrategy(
 ) : AbstractMarkerRenderingStrategy<Any>(semaphore) {
     override val markerManager: MarkerManager<Any> = MarkerManager(geocell, 0)
     private val sourceStates = ConcurrentHashMap<String, MarkerState>()
+
+    // Full marker fingerprints of the source states. MarkerState.equals() is
+    // value-based, so comparing an in-place mutated state against itself always
+    // reports "unchanged" and no recluster would ever be triggered by
+    // `markerState.position = …`. Comparing fingerprints catches it.
+    private val sourceFingerprints = ConcurrentHashMap<String, MarkerFingerPrint>()
     private val sourceStateVersion = AtomicLong(0)
     private var lastCameraPosition: MapCameraPosition? = null
     private var lastKnownViewport: GeoRectBounds? = null
@@ -130,7 +137,7 @@ class MarkerClusterStrategy(
     private var lastClusterAssignments: Map<String, String> = emptyMap()
     private var lastClusterCoverageBounds: GeoRectBounds? = null
     private var lastSourceStateVersion: Long = 0
-    private var lastSourceFingerprints: Map<String, MarkerFingerPrint> = emptyMap()
+    private var lastSourceFingerprints: Map<String, PositionFingerPrint> = emptyMap()
     private var renderCount = 0
 
     // ConcurrentHashMap: mutated by the render worker, also read from the
@@ -153,6 +160,7 @@ class MarkerClusterStrategy(
 
     override fun clear() {
         sourceStates.clear()
+        sourceFingerprints.clear()
         sourceStateVersion.set(0)
         markerManager.clear()
         _debugInfoFlow.value = emptyList()
@@ -184,6 +192,13 @@ class MarkerClusterStrategy(
      * when [debugHullPolygons][MarkerClusterGroupState.debugHullPolygons]
      * is enabled.
      */
+    /**
+     * True when this source marker has already been handed to the strategy.
+     * [MarkerClusterGroup] gates update-handler callbacks on it so a marker the
+     * strategy does not track is never forwarded.
+     */
+    fun hasSourceMarker(id: String): Boolean = sourceStates.containsKey(id)
+
     fun forceRender() {
         forceNextRender.set(true)
         val cameraPosition = lastCameraPosition ?: return
@@ -214,9 +229,11 @@ class MarkerClusterStrategy(
     ): Boolean {
         // Guard mutations with the same semaphore to avoid ConcurrentModificationException.
         semaphore.withPermit {
-            val prev = sourceStates[state.id]
-            if (prev != state) {
-                sourceStates[state.id] = state
+            val nextFingerPrint = state.fingerPrint()
+            val prevFingerPrint = sourceFingerprints[state.id]
+            sourceStates[state.id] = state
+            sourceFingerprints[state.id] = nextFingerPrint
+            if (prevFingerPrint != nextFingerPrint) {
                 sourceStateVersion.incrementAndGet()
             }
         }
@@ -305,14 +322,16 @@ class MarkerClusterStrategy(
         var changed = false
         removedIds.forEach {
             sourceStates.remove(it)
+            sourceFingerprints.remove(it)
             changed = true
         }
         data.forEach { state ->
-            val prev = sourceStates[state.id]
-            if (prev != state) {
+            val nextFingerPrint = state.fingerPrint()
+            if (sourceFingerprints[state.id] != nextFingerPrint) {
                 changed = true
             }
             sourceStates[state.id] = state
+            sourceFingerprints[state.id] = nextFingerPrint
         }
         if (changed) {
             sourceStateVersion.incrementAndGet()
@@ -338,7 +357,7 @@ class MarkerClusterStrategy(
             val sourceStateVersionSnapshot = sourceStateVersion.get()
             val lastSourceStateVersionSnapshot = lastSourceStateVersion
             val lastSourceFingerprintsSnapshot = lastSourceFingerprints
-            val currentFingerprints = mutableMapOf<String, MarkerFingerPrint>()
+            val currentFingerprints = mutableMapOf<String, PositionFingerPrint>()
             val stableSource = sourceStateVersionSnapshot == lastSourceStateVersionSnapshot
             val cameraMoved =
                 lastRenderCameraPosition?.let { previous ->
@@ -425,7 +444,7 @@ class MarkerClusterStrategy(
                 currentCoroutineContext().ensureActive()
                 if (!containsInViewport(expandedBounds, state.position)) return@forEach
 
-                val fp = MarkerFingerPrint.from(state.position)
+                val fp = PositionFingerPrint.from(state.position)
                 currentFingerprints[state.id] = fp
                 val movedSinceLastRender = lastSourceFingerprintsSnapshot[state.id]?.let { it != fp } ?: true
 
@@ -1792,13 +1811,18 @@ class MarkerClusterStrategy(
         val y: Int,
     )
 
-    private data class MarkerFingerPrint(
+    /**
+     * Position-only fingerprint used to decide whether a marker moved since the
+     * last render. Distinct from [MarkerFingerPrint], which covers the whole
+     * marker and drives [sourceStateVersion].
+     */
+    private data class PositionFingerPrint(
         val latBits: Long,
         val lonBits: Long,
     ) {
         companion object {
-            fun from(position: GeoPointInterface): MarkerFingerPrint =
-                MarkerFingerPrint(
+            fun from(position: GeoPointInterface): PositionFingerPrint =
+                PositionFingerPrint(
                     latBits = java.lang.Double.doubleToLongBits(position.latitude),
                     lonBits = java.lang.Double.doubleToLongBits(position.longitude),
                 )

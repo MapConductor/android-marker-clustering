@@ -23,7 +23,6 @@ import com.mapconductor.core.map.LocalMapServiceRegistry
 import com.mapconductor.core.map.LocalMapViewController
 import com.mapconductor.core.marker.MarkerCollector
 import com.mapconductor.core.marker.MarkerIconInterface
-import com.mapconductor.core.marker.MarkerRenderingStrategyInterface
 import com.mapconductor.core.marker.MarkerRenderingSupport
 import com.mapconductor.core.marker.MarkerRenderingSupportKey
 import com.mapconductor.core.marker.MarkerState
@@ -34,6 +33,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
+
+// Debug hull polygon styling. Fixed rather than configurable: `debugHullPolygons`
+// is the only debug knob the public API exposes on all three platforms.
+private val DEBUG_HULL_STROKE_WIDTH: Dp = 2.dp
+private const val DEBUG_HULL_STROKE_ALPHA: Float = 0.8f
+private const val DEBUG_HULL_FILL_ALPHA: Float = 0.18f
 
 @Composable
 fun MapViewScope.MarkerClusterGroup(
@@ -117,18 +122,15 @@ fun MapViewScope.MarkerClusterGroup(
             polygonCollector,
             state.debugHullPolygons,
             debugInfos,
-            state.debugHullStrokeWidth,
-            state.debugHullStrokeAlpha,
-            state.debugHullFillAlpha,
         ) {
             activeHullIds =
                 if (state.debugHullPolygons) {
                     syncDebugHullPolygons(
                         polygonCollector = polygonCollector,
                         debugInfos = debugInfos,
-                        strokeWidth = state.debugHullStrokeWidth,
-                        strokeAlpha = state.debugHullStrokeAlpha,
-                        fillAlpha = state.debugHullFillAlpha,
+                        strokeWidth = DEBUG_HULL_STROKE_WIDTH,
+                        strokeAlpha = DEBUG_HULL_STROKE_ALPHA,
+                        fillAlpha = DEBUG_HULL_FILL_ALPHA,
                         activeHullIds = activeHullIds,
                     )
                 } else {
@@ -143,14 +145,11 @@ fun MapViewScope.MarkerClusterGroup(
             strategy,
             polygonCollector,
             state.debugHullPolygons,
-            state.debugHullStrokeWidth,
-            state.debugHullStrokeAlpha,
-            state.debugHullFillAlpha,
         ) {
             if (state.debugHullPolygons) {
-                val strokeWidth = state.debugHullStrokeWidth
-                val strokeAlpha = state.debugHullStrokeAlpha
-                val fillAlpha = state.debugHullFillAlpha
+                val strokeWidth = DEBUG_HULL_STROKE_WIDTH
+                val strokeAlpha = DEBUG_HULL_STROKE_ALPHA
+                val fillAlpha = DEBUG_HULL_FILL_ALPHA
 
                 strategy.onBeforeAnimation = { nextDebugInfos ->
                     // Build polygon states on a background thread, then commit
@@ -250,9 +249,6 @@ fun MapViewScope.MarkerClusterGroup(
     zoomAnimationDurationMillis: Long = MarkerClusterStrategy.DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS,
     debugIncludeRenderCount: Boolean = false,
     debugHullPolygons: Boolean = false,
-    debugHullStrokeWidth: Dp = 2.dp,
-    debugHullStrokeAlpha: Float = 0.8f,
-    debugHullFillAlpha: Float = 0.18f,
     cameraIdleDebounceMillis: Long = MarkerClusterStrategy.DEFAULT_CAMERA_DEBOUNCE_MILLIS,
     tileSize: Double = MarkerClusterStrategy.DEFAULT_TILE_SIZE,
     markers: List<MarkerState>,
@@ -279,9 +275,6 @@ fun MapViewScope.MarkerClusterGroup(
         zoomAnimationDurationMillis = zoomAnimationDurationMillis,
         debugIncludeRenderCount = debugIncludeRenderCount,
         debugHullPolygons = debugHullPolygons,
-        debugHullStrokeWidth = debugHullStrokeWidth,
-        debugHullStrokeAlpha = debugHullStrokeAlpha,
-        debugHullFillAlpha = debugHullFillAlpha,
         cameraIdleDebounceMillis = cameraIdleDebounceMillis,
         tileSize = tileSize,
     ) {
@@ -312,9 +305,6 @@ fun MapViewScope.MarkerClusterGroup(
     zoomAnimationDurationMillis: Long = MarkerClusterStrategy.DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS,
     debugIncludeRenderCount: Boolean = false,
     debugHullPolygons: Boolean = false,
-    debugHullStrokeWidth: Dp = 2.dp,
-    debugHullStrokeAlpha: Float = 0.8f,
-    debugHullFillAlpha: Float = 0.18f,
     cameraIdleDebounceMillis: Long = MarkerClusterStrategy.DEFAULT_CAMERA_DEBOUNCE_MILLIS,
     tileSize: Double = MarkerClusterStrategy.DEFAULT_TILE_SIZE,
     content: @Composable () -> Unit,
@@ -341,9 +331,6 @@ fun MapViewScope.MarkerClusterGroup(
             zoomAnimationDurationMillis,
             debugIncludeRenderCount,
             debugHullPolygons,
-            debugHullStrokeWidth,
-            debugHullStrokeAlpha,
-            debugHullFillAlpha,
             cameraIdleDebounceMillis,
             tileSize,
         ) {
@@ -364,9 +351,6 @@ fun MapViewScope.MarkerClusterGroup(
                 enablePanAnimation = enablePanAnimation,
                 zoomAnimationDurationMillis = zoomAnimationDurationMillis,
                 debugHullPolygons = debugHullPolygons,
-                debugHullStrokeWidth = debugHullStrokeWidth,
-                debugHullStrokeAlpha = debugHullStrokeAlpha,
-                debugHullFillAlpha = debugHullFillAlpha,
                 cameraIdleDebounceMillis = cameraIdleDebounceMillis,
                 tileSize = tileSize,
             )
@@ -481,7 +465,7 @@ private fun assignDistinctDebugColors(infos: List<MarkerClusterDebugInfo>): Map<
 @OptIn(FlowPreview::class)
 @Composable
 private fun MarkerRenderingGroup(
-    strategy: MarkerRenderingStrategyInterface<Any>,
+    strategy: MarkerClusterStrategy,
     trackMarkerUpdates: Boolean,
     content: @Composable () -> Unit,
 ) {
@@ -517,10 +501,15 @@ private fun MarkerRenderingGroup(
         isRegistered = true
     }
 
-    DisposableEffect(markerCollector, markerController, trackMarkerUpdates) {
+    DisposableEffect(markerCollector, markerController, strategy, trackMarkerUpdates) {
         if (trackMarkerUpdates) {
+            // Gated on the strategy's source set, not on `getEntity(id) != null`.
+            // A member swallowed by a cluster has no entity of its own, so the
+            // entity check would drop exactly the markers that need forwarding:
+            // moving one must still re-cluster. Matches ios-marker-cluster's
+            // `statesById[state.id] != nil` guard.
             markerCollector.setUpdateHandler { markerState ->
-                if (markerController.getEntity(markerState.id) != null) {
+                if (strategy.hasSourceMarker(markerState.id)) {
                     withContext(Dispatchers.Default) {
                         markerController.update(markerState)
                     }

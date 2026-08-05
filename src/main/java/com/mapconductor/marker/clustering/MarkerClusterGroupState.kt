@@ -22,14 +22,10 @@ class MarkerClusterGroupState(
     spiderfyLegColor: Color = Color(0xFF666666),
     spiderfyLegWidth: Dp = 1.5.dp,
     onSpiderfyChange: ((Boolean) -> Unit)? = null,
-    debugClusterTurnLabel: Boolean = false,
     enableZoomAnimation: Boolean = false,
     enablePanAnimation: Boolean = false,
     zoomAnimationDurationMillis: Long = MarkerClusterStrategy.DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS,
     debugHullPolygons: Boolean = false,
-    debugHullStrokeWidth: Dp = 2.dp,
-    debugHullStrokeAlpha: Float = 0.8f,
-    debugHullFillAlpha: Float = 0.18f,
     cameraIdleDebounceMillis: Long = MarkerClusterStrategy.DEFAULT_CAMERA_DEBOUNCE_MILLIS,
     tileSize: Double = MarkerClusterStrategy.DEFAULT_TILE_SIZE,
 ) {
@@ -45,14 +41,10 @@ class MarkerClusterGroupState(
     var spiderfyLegColor by mutableStateOf(spiderfyLegColor)
     var spiderfyLegWidth by mutableStateOf(spiderfyLegWidth)
     var onSpiderfyChange by mutableStateOf(onSpiderfyChange)
-    var debugClusterTurnLabel by mutableStateOf(debugClusterTurnLabel)
     var enableZoomAnimation by mutableStateOf(enableZoomAnimation)
     var enablePanAnimation by mutableStateOf(enablePanAnimation)
     var zoomAnimationDurationMillis by mutableStateOf(zoomAnimationDurationMillis)
     var debugHullPolygons by mutableStateOf(debugHullPolygons)
-    var debugHullStrokeWidth by mutableStateOf(debugHullStrokeWidth)
-    var debugHullStrokeAlpha by mutableStateOf(debugHullStrokeAlpha)
-    var debugHullFillAlpha by mutableStateOf(debugHullFillAlpha)
     var cameraIdleDebounceMillis by mutableStateOf(cameraIdleDebounceMillis)
     var tileSize by mutableStateOf(tileSize)
 }
