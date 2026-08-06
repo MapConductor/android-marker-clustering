@@ -18,7 +18,7 @@ import com.mapconductor.compose.marker.LocalMarkerCollector
 import com.mapconductor.compose.marker.Markers
 import com.mapconductor.compose.polygon.LocalPolygonCollector
 import com.mapconductor.compose.polyline.LocalPolylineCollector
-import com.mapconductor.core.ChildCollector
+import com.mapconductor.core.OverlayCollectorInterface
 import com.mapconductor.core.map.LocalMapServiceRegistry
 import com.mapconductor.core.map.LocalMapViewController
 import com.mapconductor.core.marker.MarkerCollector
@@ -364,7 +364,7 @@ private data class DebugCellKey(
 )
 
 private suspend fun syncDebugHullPolygons(
-    polygonCollector: ChildCollector<PolygonState>,
+    polygonCollector: OverlayCollectorInterface<PolygonState>,
     debugInfos: List<MarkerClusterDebugInfo>,
     strokeWidth: Dp,
     strokeAlpha: Float,
@@ -401,7 +401,7 @@ private suspend fun syncDebugHullPolygons(
 }
 
 private fun removeDebugHullPolygons(
-    polygonCollector: ChildCollector<PolygonState>,
+    polygonCollector: OverlayCollectorInterface<PolygonState>,
     activeHullIds: Set<String>,
 ): Set<String> {
     activeHullIds.forEach { polygonCollector.remove(it) }
