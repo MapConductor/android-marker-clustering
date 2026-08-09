@@ -1,0 +1,476 @@
+public final class com.mapconductor.marker.clustering.AnimatedMove {
+  public com.mapconductor.marker.clustering.AnimatedMove(java.lang.String, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.marker.MarkerState, com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>);
+  public final java.lang.String getId();
+  public final com.mapconductor.core.features.GeoPointInterface getStart();
+  public final com.mapconductor.core.features.GeoPointInterface getEnd();
+  public final com.mapconductor.core.marker.MarkerState getBaseState();
+  public final com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object> getEntity();
+  public final void setEntity(com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>);
+  public final java.lang.String component1();
+  public final com.mapconductor.core.features.GeoPointInterface component2();
+  public final com.mapconductor.core.features.GeoPointInterface component3();
+  public final com.mapconductor.core.marker.MarkerState component4();
+  public final com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object> component5();
+  public final com.mapconductor.marker.clustering.AnimatedMove copy(java.lang.String, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.marker.MarkerState, com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterBuilder {
+  public static final com.mapconductor.marker.clustering.ClusterBuilder$Companion Companion;
+  public com.mapconductor.marker.clustering.ClusterBuilder(com.mapconductor.marker.clustering.ClusterGeometry, double, double);
+  public final double effectiveClusterRadiusPx(double);
+  public final java.lang.String buildClusterId(com.mapconductor.marker.clustering.ClusterCell, double);
+  public final com.mapconductor.marker.clustering.ClusterCell cellOf(com.mapconductor.core.features.GeoPoint, double, double);
+  public final java.util.List<com.mapconductor.marker.clustering.MergedCluster> mergeClusters(java.util.List<com.mapconductor.marker.clustering.ClusterCandidate>, double, double);
+  public final com.mapconductor.core.features.GeoPoint selectDenseCenter(java.util.List<com.mapconductor.core.marker.MarkerState>, double, double);
+}
+final class com.mapconductor.marker.clustering.ClusterBuilder$CellKey {
+  public final int getX();
+  public final int getY();
+  public final int component1();
+  public final int component2();
+  public final com.mapconductor.marker.clustering.ClusterBuilder$CellKey copy(int, int);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterBuilder$Companion {
+}
+final class com.mapconductor.marker.clustering.ClusterBuilder$PixelPoint {
+  public final com.mapconductor.core.marker.MarkerState getMember();
+  public final double getX();
+  public final double getY();
+  public final com.mapconductor.core.marker.MarkerState component1();
+  public final double component2();
+  public final double component3();
+  public final com.mapconductor.marker.clustering.ClusterBuilder$PixelPoint copy(com.mapconductor.core.marker.MarkerState, double, double);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterCandidate {
+  public com.mapconductor.marker.clustering.ClusterCandidate(com.mapconductor.marker.clustering.ClusterCell, com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public final com.mapconductor.marker.clustering.ClusterCell getCell();
+  public final com.mapconductor.core.features.GeoPoint getCenter();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> getMembers();
+  public final com.mapconductor.marker.clustering.ClusterCell component1();
+  public final com.mapconductor.core.features.GeoPoint component2();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> component3();
+  public final com.mapconductor.marker.clustering.ClusterCandidate copy(com.mapconductor.marker.clustering.ClusterCell, com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterCell {
+  public com.mapconductor.marker.clustering.ClusterCell(int, int);
+  public final int getX();
+  public final int getY();
+  public final int component1();
+  public final int component2();
+  public final com.mapconductor.marker.clustering.ClusterCell copy(int, int);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterComponents {
+  public com.mapconductor.marker.clustering.ClusterComponents(com.mapconductor.core.geocell.HexGeocellInterface, double, int, double, long, long, java.lang.Double, double, double, kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.core.marker.MarkerState>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, com.mapconductor.core.marker.MarkerManager<java.lang.Object>, java.util.concurrent.ConcurrentHashMap<java.lang.String, com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>>, com.mapconductor.core.marker.BitmapIcon, kotlinx.coroutines.CoroutineScope, kotlin.jvm.functions.Function5<? super com.mapconductor.core.map.MapCameraPosition, ? super com.mapconductor.core.features.GeoRectBounds, ? super com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, ? super java.lang.Long, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>, kotlin.jvm.functions.Function1<? super java.lang.String, com.mapconductor.core.marker.MarkerState>, com.mapconductor.marker.clustering.ClusterComponents$Overrides);
+  public final com.mapconductor.marker.clustering.ClusterGeometry getGeometry();
+  public final com.mapconductor.marker.clustering.ClusterBuilder getBuilder();
+  public final com.mapconductor.marker.clustering.ClusterPlanner getPlanner();
+  public final com.mapconductor.marker.clustering.ClusterRenderScheduler getScheduler();
+  public final com.mapconductor.marker.clustering.ClusterMarkerAnimator getAnimator();
+  public final com.mapconductor.marker.clustering.ClusterMarkerRenderer getMarkerRenderer();
+  public final com.mapconductor.marker.clustering.SpiderfyController getSpiderfy();
+}
+public final class com.mapconductor.marker.clustering.ClusterComponents$Overrides {
+  public final com.mapconductor.marker.clustering.ClusterGeometry getGeometry();
+  public final com.mapconductor.marker.clustering.ClusterBuilder getBuilder();
+  public final com.mapconductor.marker.clustering.ClusterPlanner getPlanner();
+  public final com.mapconductor.marker.clustering.ClusterMarkerAnimator getAnimator();
+  public final com.mapconductor.marker.clustering.SpiderfyLayout getSpiderfyLayout();
+}
+public final class com.mapconductor.marker.clustering.ClusterDebugHullPolygonsKt {
+  public static final void DebugHullPolygonEffects(com.mapconductor.marker.clustering.MarkerClusterStrategy, boolean, androidx.compose.runtime.Composer, int);
+  public static final java.lang.Object access$syncDebugHullPolygons-942rkJo(com.mapconductor.core.OverlayCollectorInterface, java.util.List, float, float, float, java.util.Set, kotlin.coroutines.Continuation);
+}
+public final class com.mapconductor.marker.clustering.ClusterGeometry {
+  public static final com.mapconductor.marker.clustering.ClusterGeometry$Companion Companion;
+  public com.mapconductor.marker.clustering.ClusterGeometry(com.mapconductor.core.geocell.HexGeocellInterface);
+  public final kotlin.Pair<java.lang.Double, java.lang.Double> projectToPixel(com.mapconductor.core.features.GeoPointInterface, double, double);
+  public final double metersPerPixel(com.mapconductor.core.features.GeoPointInterface, double, double);
+  public final double wrapLongitude(double);
+  public final boolean containsBounds(com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.features.GeoRectBounds);
+  public final boolean containsInViewport(com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.features.GeoPointInterface, double);
+  public final void extendCoverageBounds(com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.features.GeoPoint, double);
+  public final com.mapconductor.core.features.GeoRectBounds estimateViewport(double, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.features.GeoRectBounds, java.lang.Double);
+  public final boolean hasCameraMoved(com.mapconductor.core.map.MapCameraPosition, com.mapconductor.core.map.MapCameraPosition);
+  public final com.mapconductor.core.features.GeoPoint interpolatePosition(com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.features.GeoPointInterface, double);
+  public final com.mapconductor.core.features.GeoPoint averagePosition(java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public final com.mapconductor.core.features.GeoPoint averageGeoPoints(java.util.List<com.mapconductor.core.features.GeoPoint>);
+  public final double calculateClusterRadiusMeters(com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public final java.util.List<com.mapconductor.marker.clustering.ClusterGeometry$HullPoint> convexHullProjected(java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public final com.mapconductor.marker.clustering.ClusterGeometry$HullPoint polygonCentroidProjected(java.util.List<com.mapconductor.marker.clustering.ClusterGeometry$HullPoint>);
+  public final com.mapconductor.core.features.GeoPoint unproject(com.mapconductor.marker.clustering.ClusterGeometry$HullPoint);
+}
+public final class com.mapconductor.marker.clustering.ClusterGeometry$Companion {
+}
+public final class com.mapconductor.marker.clustering.ClusterGeometry$HullPoint {
+  public final double getX();
+  public final double getY();
+  public final double component1();
+  public final double component2();
+  public final com.mapconductor.marker.clustering.ClusterGeometry$HullPoint copy(double, double);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterMarkerAnimator {
+  public static final com.mapconductor.marker.clustering.ClusterMarkerAnimator$Companion Companion;
+  public com.mapconductor.marker.clustering.ClusterMarkerAnimator(com.mapconductor.marker.clustering.ClusterGeometry, com.mapconductor.core.marker.MarkerManager<java.lang.Object>, java.util.concurrent.ConcurrentHashMap<java.lang.String, com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>>, com.mapconductor.core.marker.BitmapIcon, kotlin.jvm.functions.Function1<? super java.lang.Long, java.lang.Boolean>);
+  public final java.lang.Object animate(java.util.List<com.mapconductor.marker.clustering.AnimatedMove>, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, long, long, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+}
+public final class com.mapconductor.marker.clustering.ClusterMarkerAnimator$Companion {
+}
+final class com.mapconductor.marker.clustering.ClusterMarkerAnimator$MutableChangeParams implements com.mapconductor.core.marker.MarkerOverlayRendererInterface$ChangeParamsInterface<java.lang.Object> {
+  public com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object> getCurrent();
+  public void setCurrent(com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>);
+  public com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object> getPrev();
+  public void setPrev(com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>);
+  public com.mapconductor.core.marker.BitmapIcon getBitmapIcon();
+}
+public final class com.mapconductor.marker.clustering.ClusterMarkerRenderer {
+  public static final com.mapconductor.marker.clustering.ClusterMarkerRenderer$Companion Companion;
+  public com.mapconductor.marker.clustering.ClusterMarkerRenderer(com.mapconductor.marker.clustering.ClusterGeometry, com.mapconductor.marker.clustering.ClusterMarkerAnimator, com.mapconductor.core.marker.MarkerManager<java.lang.Object>, java.util.concurrent.ConcurrentHashMap<java.lang.String, com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>>, com.mapconductor.core.marker.BitmapIcon, long, kotlin.jvm.functions.Function1<? super java.lang.Long, java.lang.Boolean>);
+  public final java.lang.Object updateRenderedMarkers(java.util.List<com.mapconductor.core.marker.MarkerState>, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, long, boolean, java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>, java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+  public final java.lang.Object addStatesToRenderer(java.util.List<com.mapconductor.core.marker.MarkerState>, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, kotlin.coroutines.Continuation<? super java.util.List<? extends com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>>>);
+  public final java.lang.Object cleanupStaleMarkers(double, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, boolean, kotlin.jvm.functions.Function1<? super java.lang.String, java.lang.Boolean>, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+}
+final class com.mapconductor.marker.clustering.ClusterMarkerRenderer$AnimatedAdd {
+  public final com.mapconductor.core.marker.MarkerState getState();
+  public final com.mapconductor.core.features.GeoPoint getStart();
+  public final com.mapconductor.core.marker.MarkerState component1();
+  public final com.mapconductor.core.features.GeoPoint component2();
+  public final com.mapconductor.marker.clustering.ClusterMarkerRenderer$AnimatedAdd copy(com.mapconductor.core.marker.MarkerState, com.mapconductor.core.features.GeoPoint);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+final class com.mapconductor.marker.clustering.ClusterMarkerRenderer$AnimatedRemove {
+  public final com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object> getEntity();
+  public final com.mapconductor.core.features.GeoPoint getTarget();
+  public final com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object> component1();
+  public final com.mapconductor.core.features.GeoPoint component2();
+  public final com.mapconductor.marker.clustering.ClusterMarkerRenderer$AnimatedRemove copy(com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>, com.mapconductor.core.features.GeoPoint);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterMarkerRenderer$Companion {
+}
+public final class com.mapconductor.marker.clustering.ClusterPlan {
+  public com.mapconductor.marker.clustering.ClusterPlan(java.util.List<? extends com.mapconductor.marker.clustering.PlannedEntry>, java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>, java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>, java.util.Map<java.lang.String, java.lang.String>, com.mapconductor.core.features.GeoRectBounds, java.util.Map<java.lang.String, com.mapconductor.marker.clustering.PositionFingerPrint>);
+  public final java.util.List<com.mapconductor.marker.clustering.PlannedEntry> getEntries();
+  public final java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint> getClusterMemberCenters();
+  public final java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint> getClusterPositions();
+  public final java.util.Map<java.lang.String, java.lang.String> getAssignments();
+  public final com.mapconductor.core.features.GeoRectBounds getCoverageBounds();
+  public final java.util.Map<java.lang.String, com.mapconductor.marker.clustering.PositionFingerPrint> getSourceFingerprints();
+}
+public final class com.mapconductor.marker.clustering.ClusterPlanCache {
+  public com.mapconductor.marker.clustering.ClusterPlanCache(java.util.Map<java.lang.String, java.lang.String>, java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>, com.mapconductor.core.features.GeoRectBounds, java.util.Map<java.lang.String, com.mapconductor.marker.clustering.PositionFingerPrint>);
+  public final java.util.Map<java.lang.String, java.lang.String> getAssignments();
+  public final java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint> getClusterPositions();
+  public final com.mapconductor.core.features.GeoRectBounds getCoverageBounds();
+  public final java.util.Map<java.lang.String, com.mapconductor.marker.clustering.PositionFingerPrint> getSourceFingerprints();
+}
+public final class com.mapconductor.marker.clustering.ClusterPlanner {
+  public static final com.mapconductor.marker.clustering.ClusterPlanner$Companion Companion;
+  public static final java.lang.String CLUSTER_ID_PREFIX;
+  public com.mapconductor.marker.clustering.ClusterPlanner(com.mapconductor.marker.clustering.ClusterGeometry, com.mapconductor.marker.clustering.ClusterBuilder, int);
+  public final java.lang.Object plan(java.util.Collection<com.mapconductor.core.marker.MarkerState>, com.mapconductor.core.features.GeoRectBounds, double, double, boolean, double, com.mapconductor.marker.clustering.ClusterPlanCache, kotlin.coroutines.Continuation<? super com.mapconductor.marker.clustering.ClusterPlan>);
+}
+public final class com.mapconductor.marker.clustering.ClusterPlanner$Companion {
+}
+public final class com.mapconductor.marker.clustering.ClusterRenderScheduler {
+  public com.mapconductor.marker.clustering.ClusterRenderScheduler(kotlinx.coroutines.CoroutineScope, com.mapconductor.marker.clustering.ClusterGeometry, long, kotlin.jvm.functions.Function5<? super com.mapconductor.core.map.MapCameraPosition, ? super com.mapconductor.core.features.GeoRectBounds, ? super com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, ? super java.lang.Long, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>);
+  public final com.mapconductor.core.map.MapCameraPosition getLastCameraPosition();
+  public final com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object> getLastRenderer();
+  public final com.mapconductor.core.features.GeoRectBounds getLastKnownViewport();
+  public final com.mapconductor.core.features.GeoRectBounds getLastUsedViewport();
+  public final void setLastUsedViewport(com.mapconductor.core.features.GeoRectBounds);
+  public final long getCurrentToken();
+  public final long nextToken();
+  public final boolean isCurrent(long);
+  public final void onCameraChanged(com.mapconductor.core.map.MapCameraPosition, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>);
+  public final void enqueue(com.mapconductor.core.map.MapCameraPosition, com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, long);
+  public final void reset();
+}
+final class com.mapconductor.marker.clustering.ClusterRenderScheduler$RenderRequest {
+  public final com.mapconductor.core.map.MapCameraPosition getCameraPosition();
+  public final com.mapconductor.core.features.GeoRectBounds getViewport();
+  public final com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object> getRenderer();
+  public final long getToken();
+  public final com.mapconductor.core.map.MapCameraPosition component1();
+  public final com.mapconductor.core.features.GeoRectBounds component2();
+  public final com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object> component3();
+  public final long component4();
+  public final com.mapconductor.marker.clustering.ClusterRenderScheduler$RenderRequest copy(com.mapconductor.core.map.MapCameraPosition, com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, long);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.ClusterRenderState {
+  public static final com.mapconductor.marker.clustering.ClusterRenderState$Companion Companion;
+  public com.mapconductor.marker.clustering.ClusterRenderState();
+  public final java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint> getClusterMemberCenters();
+  public final void setClusterMemberCenters(java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>);
+  public final java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint> getClusterPositions();
+  public final void setClusterPositions(java.util.Map<java.lang.String, com.mapconductor.core.features.GeoPoint>);
+  public final java.util.Map<java.lang.String, java.lang.String> getAssignments();
+  public final void setAssignments(java.util.Map<java.lang.String, java.lang.String>);
+  public final com.mapconductor.core.features.GeoRectBounds getCoverageBounds();
+  public final void setCoverageBounds(com.mapconductor.core.features.GeoRectBounds);
+  public final long getSourceStateVersion();
+  public final void setSourceStateVersion(long);
+  public final java.util.Map<java.lang.String, com.mapconductor.marker.clustering.PositionFingerPrint> getSourceFingerprints();
+  public final void setSourceFingerprints(java.util.Map<java.lang.String, com.mapconductor.marker.clustering.PositionFingerPrint>);
+  public final com.mapconductor.core.map.MapCameraPosition getRenderCameraPosition();
+  public final void setRenderCameraPosition(com.mapconductor.core.map.MapCameraPosition);
+  public final com.mapconductor.marker.clustering.ZoomChange updateClusteringTurn(double);
+  public final com.mapconductor.marker.clustering.ClusterPlanCache toPlanCache();
+  public final void commit(com.mapconductor.marker.clustering.ClusterPlan, com.mapconductor.core.map.MapCameraPosition, long);
+  public final void reset();
+}
+public final class com.mapconductor.marker.clustering.ClusterRenderState$Companion {
+}
+final class com.mapconductor.marker.clustering.DebugCellKey {
+  public com.mapconductor.marker.clustering.DebugCellKey(int, int);
+  public final int getX();
+  public final int getY();
+  public final int component1();
+  public final int component2();
+  public final com.mapconductor.marker.clustering.DebugCellKey copy(int, int);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.MarkerCluster implements java.io.Serializable {
+  public com.mapconductor.marker.clustering.MarkerCluster(int, java.util.List<java.lang.String>);
+  public final int getCount();
+  public final java.util.List<java.lang.String> getMarkerIds();
+  public final int component1();
+  public final java.util.List<java.lang.String> component2();
+  public final com.mapconductor.marker.clustering.MarkerCluster copy(int, java.util.List<java.lang.String>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.MarkerClusterDebugInfo {
+  public com.mapconductor.marker.clustering.MarkerClusterDebugInfo(java.lang.String, com.mapconductor.core.features.GeoPointInterface, double, int, int, int, java.util.List<? extends com.mapconductor.core.features.GeoPointInterface>);
+  public com.mapconductor.marker.clustering.MarkerClusterDebugInfo(java.lang.String, com.mapconductor.core.features.GeoPointInterface, double, int, int, int, java.util.List, int, kotlin.jvm.internal.DefaultConstructorMarker);
+  public final java.lang.String getId();
+  public final com.mapconductor.core.features.GeoPointInterface getCenter();
+  public final double getRadiusMeters();
+  public final int getCount();
+  public final int getCellX();
+  public final int getCellY();
+  public final java.util.List<com.mapconductor.core.features.GeoPointInterface> getHullPoints();
+  public final java.lang.String component1();
+  public final com.mapconductor.core.features.GeoPointInterface component2();
+  public final double component3();
+  public final int component4();
+  public final int component5();
+  public final int component6();
+  public final java.util.List<com.mapconductor.core.features.GeoPointInterface> component7();
+  public final com.mapconductor.marker.clustering.MarkerClusterDebugInfo copy(java.lang.String, com.mapconductor.core.features.GeoPointInterface, double, int, int, int, java.util.List<? extends com.mapconductor.core.features.GeoPointInterface>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.MarkerClusterGroupKt {
+  public static final void MarkerClusterGroup(com.mapconductor.compose.MapViewScope, com.mapconductor.marker.clustering.MarkerClusterGroupState, java.util.List<com.mapconductor.core.marker.MarkerState>, boolean, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
+  public static final void MarkerClusterGroup(com.mapconductor.compose.MapViewScope, com.mapconductor.marker.clustering.MarkerClusterGroupState, boolean, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.runtime.Composer, int, int);
+  public static final void MarkerClusterGroup-Jjngs-4(com.mapconductor.compose.MapViewScope, double, int, double, kotlin.jvm.functions.Function1<? super java.lang.Integer, ? extends com.mapconductor.core.marker.MarkerIconInterface>, kotlin.jvm.functions.Function1<? super com.mapconductor.marker.clustering.MarkerCluster, kotlin.Unit>, kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.core.marker.MarkerState>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>, java.lang.Double, double, double, long, float, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, long, float, long, boolean, boolean, long, boolean, boolean, long, double, java.util.List<com.mapconductor.core.marker.MarkerState>, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.runtime.Composer, int, int, int, int);
+  public static final void MarkerClusterGroup-23pRElw(com.mapconductor.compose.MapViewScope, double, int, double, kotlin.jvm.functions.Function1<? super java.lang.Integer, ? extends com.mapconductor.core.marker.MarkerIconInterface>, kotlin.jvm.functions.Function1<? super com.mapconductor.marker.clustering.MarkerCluster, kotlin.Unit>, kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.core.marker.MarkerState>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>, java.lang.Double, double, double, long, float, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, long, float, long, boolean, boolean, long, boolean, boolean, long, double, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.runtime.Composer, int, int, int, int);
+}
+public final class com.mapconductor.marker.clustering.MarkerClusterGroupState {
+  public com.mapconductor.marker.clustering.MarkerClusterGroupState(double, int, double, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function2, java.lang.Double, double, double, long, float, kotlin.jvm.functions.Function1, boolean, boolean, long, boolean, long, double, int, kotlin.jvm.internal.DefaultConstructorMarker);
+  public final double getClusterRadiusPx();
+  public final void setClusterRadiusPx(double);
+  public final int getMinClusterSize();
+  public final void setMinClusterSize(int);
+  public final double getExpandMargin();
+  public final void setExpandMargin(double);
+  public final kotlin.jvm.functions.Function1<java.lang.Integer, com.mapconductor.core.marker.MarkerIconInterface> getClusterIconProvider();
+  public final void setClusterIconProvider(kotlin.jvm.functions.Function1<? super java.lang.Integer, ? extends com.mapconductor.core.marker.MarkerIconInterface>);
+  public final kotlin.jvm.functions.Function1<com.mapconductor.marker.clustering.MarkerCluster, kotlin.Unit> getOnClusterClick();
+  public final void setOnClusterClick(kotlin.jvm.functions.Function1<? super com.mapconductor.marker.clustering.MarkerCluster, kotlin.Unit>);
+  public final kotlin.jvm.functions.Function2<java.util.List<com.mapconductor.core.marker.MarkerState>, kotlin.coroutines.Continuation<? super kotlin.Unit>, java.lang.Object> getPrepareExpand();
+  public final void setPrepareExpand(kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.core.marker.MarkerState>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>);
+  public final java.lang.Double getSpiderfyMinZoom();
+  public final void setSpiderfyMinZoom(java.lang.Double);
+  public final double getSpiderfyMarkerSizePx();
+  public final void setSpiderfyMarkerSizePx(double);
+  public final double getSpiderfyMarkerMarginPx();
+  public final void setSpiderfyMarkerMarginPx(double);
+  public final long getSpiderfyLegColor-0d7_KjU();
+  public final void setSpiderfyLegColor-8_81llA(long);
+  public final float getSpiderfyLegWidth-D9Ej5fM();
+  public final void setSpiderfyLegWidth-0680j_4(float);
+  public final kotlin.jvm.functions.Function1<java.lang.Boolean, kotlin.Unit> getOnSpiderfyChange();
+  public final void setOnSpiderfyChange(kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>);
+  public final boolean getEnableZoomAnimation();
+  public final void setEnableZoomAnimation(boolean);
+  public final boolean getEnablePanAnimation();
+  public final void setEnablePanAnimation(boolean);
+  public final long getZoomAnimationDurationMillis();
+  public final void setZoomAnimationDurationMillis(long);
+  public final boolean getDebugHullPolygons();
+  public final void setDebugHullPolygons(boolean);
+  public final long getCameraIdleDebounceMillis();
+  public final void setCameraIdleDebounceMillis(long);
+  public final double getTileSize();
+  public final void setTileSize(double);
+  public com.mapconductor.marker.clustering.MarkerClusterGroupState(double, int, double, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function2, java.lang.Double, double, double, long, float, kotlin.jvm.functions.Function1, boolean, boolean, long, boolean, long, double, kotlin.jvm.internal.DefaultConstructorMarker);
+}
+public final class com.mapconductor.marker.clustering.MarkerClusterStrategy extends com.mapconductor.core.marker.AbstractMarkerRenderingStrategy<java.lang.Object> {
+  public static final com.mapconductor.marker.clustering.MarkerClusterStrategy$Companion Companion;
+  public static final double DEFAULT_CLUSTER_RADIUS_PX;
+  public static final int DEFAULT_MIN_CLUSTER_SIZE;
+  public static final double DEFAULT_EXPAND_MARGIN;
+  public static final double DEFAULT_TILE_SIZE;
+  public static final long DEFAULT_ZOOM_ANIMATION_DURATION_MILLIS;
+  public static final long DEFAULT_CAMERA_DEBOUNCE_MILLIS;
+  public static final double DEFAULT_SPIDERFY_MARKER_SIZE_PX;
+  public static final double DEFAULT_SPIDERFY_MARKER_MARGIN_PX;
+  public com.mapconductor.marker.clustering.MarkerClusterStrategy(double, int, double, kotlin.jvm.functions.Function1<? super java.lang.Integer, ? extends com.mapconductor.core.marker.MarkerIconInterface>, kotlin.jvm.functions.Function2<? super java.lang.Integer, ? super java.lang.Integer, ? extends com.mapconductor.core.marker.MarkerIconInterface>, kotlin.jvm.functions.Function1<? super com.mapconductor.marker.clustering.MarkerCluster, kotlin.Unit>, kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.core.marker.MarkerState>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>, java.lang.Double, double, double, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, boolean, boolean, long, boolean, long, double, kotlinx.coroutines.sync.Semaphore, com.mapconductor.core.geocell.HexGeocellInterface);
+  public com.mapconductor.marker.clustering.MarkerClusterStrategy(double, int, double, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function2, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function2, java.lang.Double, double, double, kotlin.jvm.functions.Function1, boolean, boolean, long, boolean, long, double, kotlinx.coroutines.sync.Semaphore, com.mapconductor.core.geocell.HexGeocellInterface, int, kotlin.jvm.internal.DefaultConstructorMarker);
+  public com.mapconductor.core.marker.MarkerManager<java.lang.Object> getMarkerManager();
+  public final kotlinx.coroutines.flow.StateFlow<java.util.List<com.mapconductor.marker.clustering.MarkerClusterDebugInfo>> getDebugInfoFlow();
+  public final kotlin.jvm.functions.Function2<java.util.List<com.mapconductor.marker.clustering.MarkerClusterDebugInfo>, kotlin.coroutines.Continuation<? super kotlin.Unit>, java.lang.Object> getOnBeforeAnimation();
+  public final void setOnBeforeAnimation(kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.marker.clustering.MarkerClusterDebugInfo>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>);
+  public final kotlinx.coroutines.flow.StateFlow<java.util.List<com.mapconductor.marker.clustering.SpiderfyLeg>> getSpiderfyLegsFlow();
+  public void clear();
+  public final boolean hasSourceMarker(java.lang.String);
+  public final void forceRender();
+  public java.lang.Object onAdd(java.util.List<com.mapconductor.core.marker.MarkerState>, com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+  public java.lang.Object onUpdate(com.mapconductor.core.marker.MarkerState, com.mapconductor.core.features.GeoRectBounds, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+  public java.lang.Object onCameraChanged(com.mapconductor.core.map.MapCameraPosition, com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+  public com.mapconductor.marker.clustering.MarkerClusterStrategy();
+}
+public final class com.mapconductor.marker.clustering.MarkerClusterStrategy$Companion {
+  public final kotlin.jvm.functions.Function1<java.lang.Integer, com.mapconductor.core.marker.MarkerIconInterface> getDEFAULT_ICON_PROVIDER();
+}
+public final class com.mapconductor.marker.clustering.MarkerRenderingGroupKt {
+  public static final void MarkerRenderingGroup(com.mapconductor.marker.clustering.MarkerClusterStrategy, boolean, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.runtime.Composer, int);
+}
+public final class com.mapconductor.marker.clustering.MergedCluster {
+  public com.mapconductor.marker.clustering.MergedCluster(com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public final com.mapconductor.core.features.GeoPoint getCenter();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> getMembers();
+  public final com.mapconductor.core.features.GeoPoint component1();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> component2();
+  public final com.mapconductor.marker.clustering.MergedCluster copy(com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.PlannedCluster {
+  public com.mapconductor.marker.clustering.PlannedCluster(java.lang.String, com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>, double, com.mapconductor.marker.clustering.ClusterCell, java.util.List<? extends com.mapconductor.core.features.GeoPointInterface>);
+  public final java.lang.String getId();
+  public final com.mapconductor.core.features.GeoPoint getCenter();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> getMembers();
+  public final double getRadiusMeters();
+  public final com.mapconductor.marker.clustering.ClusterCell getCell();
+  public final java.util.List<com.mapconductor.core.features.GeoPointInterface> getHullPoints();
+  public final java.lang.String component1();
+  public final com.mapconductor.core.features.GeoPoint component2();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> component3();
+  public final double component4();
+  public final com.mapconductor.marker.clustering.ClusterCell component5();
+  public final java.util.List<com.mapconductor.core.features.GeoPointInterface> component6();
+  public final com.mapconductor.marker.clustering.PlannedCluster copy(java.lang.String, com.mapconductor.core.features.GeoPoint, java.util.List<com.mapconductor.core.marker.MarkerState>, double, com.mapconductor.marker.clustering.ClusterCell, java.util.List<? extends com.mapconductor.core.features.GeoPointInterface>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public interface com.mapconductor.marker.clustering.PlannedEntry {
+}
+public final class com.mapconductor.marker.clustering.PlannedEntry$Cluster implements com.mapconductor.marker.clustering.PlannedEntry {
+  public final com.mapconductor.marker.clustering.PlannedCluster getCluster();
+  public final com.mapconductor.marker.clustering.PlannedCluster component1();
+  public final com.mapconductor.marker.clustering.PlannedEntry$Cluster copy(com.mapconductor.marker.clustering.PlannedCluster);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.PlannedEntry$Singles implements com.mapconductor.marker.clustering.PlannedEntry {
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> getStates();
+  public final java.util.List<com.mapconductor.core.marker.MarkerState> component1();
+  public final com.mapconductor.marker.clustering.PlannedEntry$Singles copy(java.util.List<com.mapconductor.core.marker.MarkerState>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.PositionFingerPrint {
+  public static final com.mapconductor.marker.clustering.PositionFingerPrint$Companion Companion;
+  public com.mapconductor.marker.clustering.PositionFingerPrint(long, long);
+  public final long getLatBits();
+  public final long getLonBits();
+  public final long component1();
+  public final long component2();
+  public final com.mapconductor.marker.clustering.PositionFingerPrint copy(long, long);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.PositionFingerPrint$Companion {
+  public final com.mapconductor.marker.clustering.PositionFingerPrint from(com.mapconductor.core.features.GeoPointInterface);
+}
+public final class com.mapconductor.marker.clustering.SpiderfyController {
+  public static final com.mapconductor.marker.clustering.SpiderfyController$Companion Companion;
+  public com.mapconductor.marker.clustering.SpiderfyController(com.mapconductor.marker.clustering.ClusterGeometry, com.mapconductor.marker.clustering.SpiderfyLayout, com.mapconductor.core.marker.MarkerManager<java.lang.Object>, java.util.concurrent.ConcurrentHashMap<java.lang.String, com.mapconductor.core.marker.MarkerEntityInterface<java.lang.Object>>, com.mapconductor.core.marker.BitmapIcon, kotlinx.coroutines.CoroutineScope, java.lang.Double, double, double, kotlin.jvm.functions.Function2<? super java.util.List<com.mapconductor.core.marker.MarkerState>, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object>, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, kotlin.jvm.functions.Function0<com.mapconductor.core.map.MapCameraPosition>, kotlin.jvm.functions.Function0<? extends com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>>, kotlin.jvm.functions.Function1<? super java.lang.String, com.mapconductor.core.marker.MarkerState>);
+  public final kotlinx.coroutines.flow.StateFlow<java.util.List<com.mapconductor.marker.clustering.SpiderfyLeg>> getLegsFlow();
+  public final boolean isEnabled();
+  public final boolean tryToggle(com.mapconductor.marker.clustering.MarkerCluster);
+  public final java.lang.Object invalidateAndCollapse(com.mapconductor.core.marker.MarkerOverlayRendererInterface<java.lang.Object>, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+  public final void reset();
+  public static final java.lang.Object access$open-gV6Hb-E(com.mapconductor.marker.clustering.SpiderfyController, java.lang.String, java.util.List, com.mapconductor.core.features.GeoPoint, long, java.util.List, com.mapconductor.core.marker.MarkerOverlayRendererInterface, long, kotlin.coroutines.Continuation);
+}
+public final class com.mapconductor.marker.clustering.SpiderfyController$Companion {
+}
+public final class com.mapconductor.marker.clustering.SpiderfyLayout {
+  public static final com.mapconductor.marker.clustering.SpiderfyLayout$Companion Companion;
+  public com.mapconductor.marker.clustering.SpiderfyLayout();
+  public final java.util.List<androidx.compose.ui.geometry.Offset> compute(int, double, double, java.util.List<androidx.compose.ui.geometry.Offset>);
+}
+public final class com.mapconductor.marker.clustering.SpiderfyLayout$Companion {
+}
+public final class com.mapconductor.marker.clustering.SpiderfyLeg {
+  public com.mapconductor.marker.clustering.SpiderfyLeg(java.lang.String, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.features.GeoPointInterface);
+  public final java.lang.String getId();
+  public final com.mapconductor.core.features.GeoPointInterface getStart();
+  public final com.mapconductor.core.features.GeoPointInterface getEnd();
+  public final java.lang.String component1();
+  public final com.mapconductor.core.features.GeoPointInterface component2();
+  public final com.mapconductor.core.features.GeoPointInterface component3();
+  public final com.mapconductor.marker.clustering.SpiderfyLeg copy(java.lang.String, com.mapconductor.core.features.GeoPointInterface, com.mapconductor.core.features.GeoPointInterface);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+public final class com.mapconductor.marker.clustering.SpiderfyLegPolylinesKt {
+  public static final void SpiderfyLegEffects-RFCenO8(com.mapconductor.marker.clustering.MarkerClusterStrategy, long, float, androidx.compose.runtime.Composer, int);
+}
+public final class com.mapconductor.marker.clustering.ZoomChange {
+  public com.mapconductor.marker.clustering.ZoomChange(int, boolean);
+  public final int getTurn();
+  public final boolean getZoomChanged();
+  public final int component1();
+  public final boolean component2();
+  public final com.mapconductor.marker.clustering.ZoomChange copy(int, boolean);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
