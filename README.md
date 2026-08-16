@@ -8,7 +8,7 @@ It works with any map implementation (Google Maps, MapLibre, Mapbox, ArcGIS, HER
 
 ## Setup
 
-https://docs-android.mapconductor.com/setup/
+https://mapconductor.com/setup/
 
 ------------------------------------------------------------------------
 
