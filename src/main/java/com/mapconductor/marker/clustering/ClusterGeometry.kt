@@ -1,5 +1,6 @@
 package com.mapconductor.marker.clustering
 
+import com.mapconductor.core.projection.ProjectedPoint
 import androidx.compose.ui.geometry.Offset
 import com.mapconductor.core.features.GeoPoint
 import com.mapconductor.core.features.GeoPointInterface
@@ -303,7 +304,7 @@ internal class ClusterGeometry(
 
     /** 投影座標を地理座標へ戻す。凸包・重心の結果を地図上へ載せるときに使う。 */
     fun unproject(point: HullPoint): GeoPoint =
-        GeoPoint.from(geocell.projection.unproject(Offset(point.x.toFloat(), point.y.toFloat())).wrap())
+        GeoPoint.from(geocell.projection.unproject(ProjectedPoint(point.x, point.y)).wrap())
 
     internal data class HullPoint(
         val x: Double,
