@@ -1,7 +1,5 @@
 package com.mapconductor.marker.clustering
 
-import com.mapconductor.core.projection.ProjectedPoint
-import androidx.compose.ui.geometry.Offset
 import com.mapconductor.core.features.GeoPoint
 import com.mapconductor.core.features.GeoPointInterface
 import com.mapconductor.core.features.GeoRectBounds
@@ -9,6 +7,7 @@ import com.mapconductor.core.geocell.HexGeocellInterface
 import com.mapconductor.core.map.MapCameraPosition
 import com.mapconductor.core.marker.MarkerState
 import com.mapconductor.core.projection.Earth
+import com.mapconductor.core.projection.ProjectedPoint
 import com.mapconductor.core.spherical.Spherical
 import kotlin.math.abs
 import kotlin.math.cos
