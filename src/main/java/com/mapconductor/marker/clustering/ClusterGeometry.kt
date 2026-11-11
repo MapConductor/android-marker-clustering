@@ -273,20 +273,30 @@ internal class ClusterGeometry(
         return if (hull.size >= 3) hull else emptyList()
     }
 
-    /** 靴ひも公式による多角形重心。面積が潰れている場合は頂点平均へ落とす。 */
+    /**
+     * 靴ひも公式による多角形重心。面積が潰れている場合は頂点平均へ落とす。
+     * 外積は最初の頂点からの相対座標で取る。絶対座標のままだと値が大きすぎて、
+     * 数 m 間隔のマーカーでは桁落ちで重心が数十 km ずれる。
+     */
     fun polygonCentroidProjected(hull: List<HullPoint>): HullPoint? {
         if (hull.size < 3) return null
 
+        val ox = hull[0].x
+        val oy = hull[0].y
         var twiceArea = 0.0
         var cx = 0.0
         var cy = 0.0
         for (i in hull.indices) {
             val a = hull[i]
             val b = hull[(i + 1) % hull.size]
-            val cross = a.x * b.y - b.x * a.y
+            val ax = a.x - ox
+            val ay = a.y - oy
+            val bx = b.x - ox
+            val by = b.y - oy
+            val cross = ax * by - bx * ay
             twiceArea += cross
-            cx += (a.x + b.x) * cross
-            cy += (a.y + b.y) * cross
+            cx += (ax + bx) * cross
+            cy += (ay + by) * cross
         }
 
         if (abs(twiceArea) < 1e-6) {
@@ -296,9 +306,7 @@ internal class ClusterGeometry(
             return HullPoint(ax, ay)
         }
 
-        cx /= (3.0 * twiceArea)
-        cy /= (3.0 * twiceArea)
-        return HullPoint(cx, cy)
+        return HullPoint(ox + cx / (3.0 * twiceArea), oy + cy / (3.0 * twiceArea))
     }
 
     /** 投影座標を地理座標へ戻す。凸包・重心の結果を地図上へ載せるときに使う。 */
