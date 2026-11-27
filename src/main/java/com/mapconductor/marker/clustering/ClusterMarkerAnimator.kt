@@ -94,7 +94,7 @@ internal class ClusterMarkerAnimator(
             moves.forEachIndexed { index, move ->
                 val position = geometry.interpolatePosition(move.start, move.end, t)
                 val prevEntity = move.entity
-                val nextState = move.baseState.copy(position = position)
+                val nextState = move.baseState.copy(id = move.baseState.id, position = position)
                 val nextEntity =
                     MarkerEntity(
                         marker = prevEntity.marker,

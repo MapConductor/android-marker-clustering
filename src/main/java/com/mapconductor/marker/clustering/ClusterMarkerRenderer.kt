@@ -232,7 +232,7 @@ internal class ClusterMarkerRenderer(
         val animatedStartEntities =
             if (animatedAddEntries.isNotEmpty()) {
                 val animatedStartStates =
-                    animatedAddEntries.map { entry -> entry.state.copy(position = entry.start) }
+                    animatedAddEntries.map { entry -> entry.state.copy(id = entry.state.id, position = entry.start) }
                 val added = addStatesToRenderer(animatedStartStates, renderer)
                 renderer.onPostProcess()
                 added
